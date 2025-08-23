@@ -44,3 +44,4 @@ This codebase controls a multi-room haunted house automation system for Hallowee
 
 ---
 _Revise this file as the project evolves. For unclear areas, consult the legacy file or ask maintainers._
+
