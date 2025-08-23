@@ -1,0 +1,42 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# --- Logs ---
+logs/
+*.log
+*.txt
+
+# HauntedHouse2025 specific logs
+HauntedHouse2025/logs/
+HauntedHouse2025/**/*.log
+HauntedHouse2025/**/*.txt
+
+# --- Virtual environments ---
+.venv/
+env/
+venv/
+
+# --- IDE / Editor junk ---
+.vscode/
+.idea/
+*.code-workspace
+
+# --- ESP32 / Arduino ---
+*.elf
+*.bin
+*.hex
+.pio/
+build/
+sdkconfig.old
+*.map
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+desktop.ini
