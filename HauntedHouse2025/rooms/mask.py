@@ -2,6 +2,7 @@
 import time as t
 from context import house
 from control.audio_manager import play_to_named_channel
+import utils
 
 def run():
     print("[MaskRoom] Starting...")

@@ -1,4 +1,4 @@
-# Copilot Instructions for Halloween2025-Code
+# Instructions for Halloween2025-Code
 
 ## Project Overview
 This codebase controls a multi-room haunted house automation system for Halloween events. It orchestrates audio, lighting, sensors, and hardware (e.g., Arduino, ESP32) across themed rooms. The system is modular, with clear separation between control logic, room behaviors, UI, and hardware integration.
