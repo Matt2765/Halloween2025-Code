@@ -1,0 +1,319 @@
+[2025-07-05 20:22:46] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:03:04] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:29:43] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:32:15] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:34:08] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:34:35] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:35:16] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:35:17] [System] Initializing haunted house...
+[2025-07-05 21:35:17] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 21:35:18] [Sensor] Starting analog update loop...
+[2025-07-05 21:35:18] [Sensor] Analog update loop stopped.
+[2025-07-05 21:35:18] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 21:38:25] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:38:26] [System] Initializing haunted house...
+[2025-07-05 21:38:26] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 21:38:27] [Sensor] Starting analog update loop...
+[2025-07-05 21:38:27] [Sensor] Analog update loop stopped.
+[2025-07-05 21:38:27] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 21:38:27] [Doors] Door 1 process created.
+[2025-07-05 21:38:27] [Doors] Door 2 process created.
+[2025-07-05 21:38:27] [Doors] Door 3 process created.
+[2025-07-05 21:38:27] [Doors] All door threads started.
+[2025-07-05 21:38:27] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 21:38:27] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 21:38:27] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 21:38:27] [Doors] Door 1 opening...
+[2025-07-05 21:38:27] [Doors] Door 2 opening...
+[2025-07-05 21:38:27] [Doors] Door 3 opening...
+[2025-07-05 21:38:27] [System] Initialization complete. System is ONLINE.
+[2025-07-05 21:45:23] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:45:53] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:45:53] [System] Initializing haunted house...
+[2025-07-05 21:45:53] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 21:45:54] [Sensor] Starting analog update loop...
+[2025-07-05 21:45:54] [Sensor] Analog update loop stopped.
+[2025-07-05 21:45:54] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 21:45:54] [Doors] Door 1 process created.
+[2025-07-05 21:45:54] [Doors] Door 2 process created.
+[2025-07-05 21:45:54] [Doors] Door 3 process created.
+[2025-07-05 21:45:54] [Doors] All door threads started.
+[2025-07-05 21:45:54] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 21:45:54] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 21:45:54] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 21:45:54] [Doors] Door 1 opening...
+[2025-07-05 21:45:54] [Doors] Door 2 opening...
+[2025-07-05 21:45:54] [Doors] Door 3 opening...
+[2025-07-05 21:45:54] [System] Initialization complete. System is ONLINE.
+[2025-07-05 21:45:58] Shutdown ID unknown - Please type keyword 'SAFE' into terminal to return to standby mode.
+[2025-07-05 21:46:00] [Doors] Door 3 OPEN
+[2025-07-05 21:46:00] [Doors] Door 1 OPEN
+[2025-07-05 21:46:00] [Doors] Door 2 OPEN
+[2025-07-05 21:46:08] [System] Initializing haunted house...
+[2025-07-05 21:46:08] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 21:46:09] [Sensor] Starting analog update loop...
+[2025-07-05 21:46:09] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 21:46:09] [Sensor] Analog update loop stopped.
+[2025-07-05 21:46:09] [Doors] Door 1 process created.
+[2025-07-05 21:46:09] [Doors] Door 2 process created.
+[2025-07-05 21:46:09] [Doors] Door 3 process created.
+[2025-07-05 21:46:09] [Doors] All door threads started.
+[2025-07-05 21:46:09] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 21:46:09] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 21:46:09] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 21:46:09] [Doors] Door 1 opening...
+[2025-07-05 21:46:09] [Doors] Door 3 opening...
+[2025-07-05 21:46:09] [System] Initialization complete. System is ONLINE.
+[2025-07-05 21:46:15] [Doors] Door 2 OPEN
+[2025-07-05 21:46:15] [Doors] Door 3 OPEN
+[2025-07-05 21:46:15] [Doors] Door 1 OPEN
+[2025-07-05 21:47:01] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:47:01] [System] Initializing haunted house...
+[2025-07-05 21:47:01] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 21:47:02] [Sensor] Starting analog update loop...
+[2025-07-05 21:47:02] [Sensor] Analog update loop stopped.
+[2025-07-05 21:47:02] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 21:47:02] [Doors] Door 1 process created.
+[2025-07-05 21:47:02] [Doors] Door 2 process created.
+[2025-07-05 21:47:02] [Doors] Door 3 process created.
+[2025-07-05 21:47:02] [Doors] All door threads started.
+[2025-07-05 21:47:02] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 21:47:02] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 21:47:02] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 21:47:02] [Doors] Door 1 opening...
+[2025-07-05 21:47:02] [Doors] Door 2 opening...
+[2025-07-05 21:47:02] [Doors] Door 3 opening...
+[2025-07-05 21:47:02] [System] Initialization complete. System is ONLINE.
+[2025-07-05 21:47:06] Shutdown ID unknown - Please type keyword 'SAFE' into terminal to return to standby mode.
+[2025-07-05 21:47:08] [Doors] Door 3 OPEN
+[2025-07-05 21:47:08] [Doors] Door 2 OPEN
+[2025-07-05 21:48:08] [System] Initializing haunted house...
+[2025-07-05 21:48:08] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 21:48:09] [Sensor] Starting analog update loop...
+[2025-07-05 21:48:09] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 21:48:09] [Sensor] Analog update loop stopped.
+[2025-07-05 21:48:10] [Doors] Door 1 process created.
+[2025-07-05 21:48:10] [Doors] Door 2 process created.
+[2025-07-05 21:48:10] [Doors] Door 3 process created.
+[2025-07-05 21:48:10] [Doors] All door threads started.
+[2025-07-05 21:48:10] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 21:48:10] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 21:48:10] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 21:48:10] [Doors] Door 1 opening...
+[2025-07-05 21:48:10] [Doors] Door 2 opening...
+[2025-07-05 21:48:10] [Doors] Door 3 opening...
+[2025-07-05 21:48:10] [System] Initialization complete. System is ONLINE.
+[2025-07-05 21:48:16] [Doors] Door 3 OPEN
+[2025-07-05 21:48:16] [Doors] Door 2 OPEN
+[2025-07-05 21:48:16] [Doors] Door 1 OPEN
+[2025-07-05 21:53:27] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:53:27] [System] Initializing haunted house...
+[2025-07-05 21:53:27] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 21:53:28] [Sensor] Starting analog update loop...
+[2025-07-05 21:53:28] [Sensor] Analog update loop stopped.
+[2025-07-05 21:53:28] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 21:53:28] [Doors] Door 1 process created.
+[2025-07-05 21:53:28] [Doors] Door 2 process created.
+[2025-07-05 21:53:28] [Doors] Door 3 process created.
+[2025-07-05 21:53:28] [Doors] All door threads started.
+[2025-07-05 21:53:28] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 21:53:28] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 21:53:28] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 21:53:28] [Doors] Door 1 opening...
+[2025-07-05 21:53:28] [Doors] Door 2 opening...
+[2025-07-05 21:53:28] [Doors] Door 3 opening...
+[2025-07-05 21:53:28] [System] Initialization complete. System is ONLINE.
+[2025-07-05 21:53:34] [Doors] Door 2 OPEN
+[2025-07-05 21:53:34] [Doors] Door 1 OPEN
+[2025-07-05 21:53:34] [Doors] Door 3 OPEN
+[2025-07-05 21:53:44] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:53:44] [System] Initializing haunted house...
+[2025-07-05 21:53:44] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 21:53:45] [Sensor] Starting analog update loop...
+[2025-07-05 21:53:45] [Sensor] Analog update loop stopped.
+[2025-07-05 21:53:45] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 21:53:45] [Doors] Door 1 process created.
+[2025-07-05 21:53:45] [Doors] Door 2 process created.
+[2025-07-05 21:53:45] [Doors] Door 3 process created.
+[2025-07-05 21:53:45] [Doors] All door threads started.
+[2025-07-05 21:53:45] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 21:53:45] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 21:53:45] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 21:53:45] [Doors] Door 1 opening...
+[2025-07-05 21:53:45] [Doors] Door 2 opening...
+[2025-07-05 21:53:45] [Doors] Door 3 opening...
+[2025-07-05 21:53:45] [System] Initialization complete. System is ONLINE.
+[2025-07-05 21:53:51] [Doors] Door 1 OPEN
+[2025-07-05 21:53:51] [Doors] Door 2 OPEN
+[2025-07-05 21:53:51] [Doors] Door 3 OPEN
+[2025-07-05 21:59:41] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 21:59:41] [System] Initializing haunted house...
+[2025-07-05 21:59:41] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 21:59:42] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 21:59:42] [Doors] Door 1 process created.
+[2025-07-05 21:59:42] [Doors] Door 2 process created.
+[2025-07-05 21:59:42] [Doors] Door 3 process created.
+[2025-07-05 21:59:42] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 21:59:42] [Doors] All door threads started.
+[2025-07-05 21:59:42] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 21:59:42] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 21:59:42] [Doors] Door 1 opening...
+[2025-07-05 21:59:42] [Doors] Door 2 opening...
+[2025-07-05 21:59:42] [Doors] Door 3 opening...
+[2025-07-05 21:59:42] [System] Initialization complete. System is ONLINE.
+[2025-07-05 21:59:48] [Doors] Door 3 OPEN
+[2025-07-05 21:59:48] [Doors] Door 1 OPEN
+[2025-07-05 21:59:48] [Doors] Door 2 OPEN
+[2025-07-05 22:00:06] [System] Launching main sequence...
+[2025-07-05 22:00:06] [Arduino] (Simulated) m1Digital_Write(pin=23, value=0)
+[2025-07-05 22:00:06] [Doors] Door 1 closing...
+[2025-07-05 22:04:53] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 22:04:53] [System] Initializing haunted house...
+[2025-07-05 22:04:53] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 22:04:54] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 22:04:55] [Doors] Door 1 process created.
+[2025-07-05 22:04:55] [Doors] Door 2 process created.
+[2025-07-05 22:04:55] [Doors] All door threads started.
+[2025-07-05 22:04:55] [Doors] Door 3 process created.
+[2025-07-05 22:04:55] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 22:04:55] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 22:04:55] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 22:04:55] [Doors] Door 1 opening...
+[2025-07-05 22:04:55] [Doors] Door 2 opening...
+[2025-07-05 22:04:55] [Doors] Door 3 opening...
+[2025-07-05 22:04:55] [System] Initialization complete. System is ONLINE.
+[2025-07-05 22:05:01] [Doors] Door 1 OPEN
+[2025-07-05 22:05:01] [Doors] Door 3 OPEN
+[2025-07-05 22:05:01] [Doors] Door 2 OPEN
+[2025-07-05 22:05:44] [System] Launching main sequence...
+[2025-07-05 22:05:44] [Arduino] (Simulated) m1Digital_Write(pin=23, value=0)
+[2025-07-05 22:05:44] [Doors] Door 1 closing...
+[2025-07-05 22:05:45] House is already active. Please stop the house before attemping to re-start it.
+[2025-07-05 22:06:40] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 22:06:40] [System] Initializing haunted house...
+[2025-07-05 22:06:40] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 22:06:42] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 22:06:42] [Doors] Door 1 process created.
+[2025-07-05 22:06:42] [Doors] Door 2 process created.
+[2025-07-05 22:06:42] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 22:06:42] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 22:06:42] [Doors] Door 3 process created.
+[2025-07-05 22:06:42] [Doors] All door threads started.
+[2025-07-05 22:06:42] [Doors] Door 1 opening...
+[2025-07-05 22:06:42] [Doors] Door 2 opening...
+[2025-07-05 22:06:42] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 22:06:42] [Doors] Door 3 opening...
+[2025-07-05 22:06:42] [System] Initialization complete. System is ONLINE.
+[2025-07-05 22:06:45] [System] Launching main sequence...
+[2025-07-05 22:06:45] [Arduino] (Simulated) m1Digital_Write(pin=23, value=0)
+[2025-07-05 22:06:45] [Doors] Door 1 closing...
+[2025-07-05 22:06:46] House is already active. Please stop the house before attemping to re-start it.
+[2025-07-05 22:14:28] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 22:14:28] [System] Initializing haunted house...
+[2025-07-05 22:14:28] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 22:14:29] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 22:14:29] [Doors] Door 2 process created.
+[2025-07-05 22:14:29] [Doors] Door 1 process created.
+[2025-07-05 22:14:29] [Doors] Door 3 process created.
+[2025-07-05 22:14:29] [Doors] All door threads started.
+[2025-07-05 22:14:29] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 22:14:29] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 22:14:29] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 22:14:29] [Doors] Door 2 opening...
+[2025-07-05 22:14:29] [Doors] Door 1 opening...
+[2025-07-05 22:14:29] [Doors] Door 3 opening...
+[2025-07-05 22:14:30] [System] Initialization complete. System is ONLINE.
+[2025-07-05 22:14:35] [Doors] Door 1 OPEN
+[2025-07-05 22:14:35] [Doors] Door 3 OPEN
+[2025-07-05 22:14:35] [Doors] Door 2 OPEN
+[2025-07-05 22:21:00] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 22:21:00] [System] Initializing haunted house...
+[2025-07-05 22:21:00] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 22:21:01] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 22:21:01] [Doors] Door 1 process created.
+[2025-07-05 22:21:01] [Doors] Door 2 process created.
+[2025-07-05 22:21:01] [Doors] All door threads started.
+[2025-07-05 22:21:01] [Doors] Door 3 process created.
+[2025-07-05 22:21:01] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 22:21:01] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 22:21:01] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 22:21:01] [Doors] Door 1 opening...
+[2025-07-05 22:21:01] [Doors] Door 2 opening...
+[2025-07-05 22:21:01] [Doors] Door 3 opening...
+[2025-07-05 22:21:02] [System] Initialization complete. System is ONLINE.
+[2025-07-05 22:21:05] [System] Launching main sequence...
+[2025-07-05 22:21:05] [Doors] Set Door 1 → CLOSED
+[2025-07-05 22:21:05] [Doors] Set Door 2 → CLOSED
+[2025-07-05 22:21:05] [Arduino] (Simulated) m1Digital_Write(pin=13, value=0)
+[2025-07-05 22:21:05] House is already active. Please stop the house before attemping to re-start it.
+[2025-07-05 22:21:05] [Arduino] (Simulated) m1Digital_Write(pin=23, value=0)
+[2025-07-05 22:21:05] [Doors] Door 2 closing...
+[2025-07-05 22:21:05] [Doors] Door 1 closing...
+[2025-07-05 22:37:01] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 22:37:01] [System] Initializing haunted house...
+[2025-07-05 22:37:01] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 22:37:02] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 22:37:02] [Doors] Door 1 process created.
+[2025-07-05 22:37:02] [Doors] Door 2 process created.
+[2025-07-05 22:37:02] [Doors] Door 3 process created.
+[2025-07-05 22:37:02] [Doors] All door threads started.
+[2025-07-05 22:37:02] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 22:37:02] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 22:37:02] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 22:37:02] [Doors] Door 1 opening...
+[2025-07-05 22:37:02] [Doors] Door 2 opening...
+[2025-07-05 22:37:02] [Doors] Door 3 opening...
+[2025-07-05 22:37:02] [System] Initialization complete. System is ONLINE.
+[2025-07-05 22:37:08] [Doors] Door 1 OPEN
+[2025-07-05 22:37:08] [Doors] Door 2 OPEN
+[2025-07-05 22:37:08] [Doors] Door 3 OPEN
+[2025-07-05 22:37:10] [System] Launching main sequence...
+[2025-07-05 22:37:10] [Doors] Set Door 1 → CLOSED
+[2025-07-05 22:37:10] [Doors] Set Door 2 → CLOSED
+[2025-07-05 22:37:10] [Arduino] (Simulated) m1Digital_Write(pin=13, value=0)
+[2025-07-05 22:37:10] [Arduino] (Simulated) m1Digital_Write(pin=25, value=0)
+[2025-07-05 22:37:10] [Arduino] (Simulated) m1Digital_Write(pin=23, value=0)
+[2025-07-05 22:37:10] [Doors] Door 2 closing...
+[2025-07-05 22:37:10] [Doors] Door 1 closing...
+[2025-07-05 22:37:10] House is already active. Please stop the house before attemping to re-start it.
+[2025-07-05 22:40:59] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 22:40:59] [System] Initializing haunted house...
+[2025-07-05 22:40:59] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 22:41:41] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 22:41:41] [System] Initializing haunted house...
+[2025-07-05 22:41:41] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 22:41:42] [Doors] All door threads started.
+[2025-07-05 22:41:42] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 22:41:42] [System] Initialization complete. System is ONLINE.
+[2025-07-05 22:42:44] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 22:42:44] [System] Initializing haunted house...
+[2025-07-05 22:42:44] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 22:42:45] [Doors] All door threads started.
+[2025-07-05 22:42:45] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 22:42:45] [System] Initialization complete. System is ONLINE.
+[2025-07-05 22:43:46] [Arduino] Failed to connect: arduino_instance_id does not match a value on the boards.
+[2025-07-05 22:43:46] [System] Initializing haunted house...
+[2025-07-05 22:43:46] [Arduino] connectArduino() called: no board connected (simulated mode).
+[2025-07-05 22:43:47] [Doors] Door 1 process created.
+[2025-07-05 22:43:47] [Doors] Door 2 process created.
+[2025-07-05 22:43:47] [Doors] All door threads started.
+[2025-07-05 22:43:47] [Doors] Door 3 process created.
+[2025-07-05 22:43:47] [Arduino] (Simulated) m1Digital_Write(pin=23, value=1)
+[2025-07-05 22:43:47] [Arduino] (Simulated) m1Digital_Write(pin=25, value=1)
+[2025-07-05 22:43:47] [Arduino] (Simulated) m1Digital_Write(pin=26, value=1)
+[2025-07-05 22:43:47] [Doors] Door 1 opening...
+[2025-07-05 22:43:47] [Doors] Door 2 opening...
+[2025-07-05 22:43:47] [Doors] Door 3 opening...
+[2025-07-05 22:43:47] [HTTP] Server started at http://0.0.0.0:9999
+[2025-07-05 22:43:47] [System] Initialization complete. System is ONLINE.
+[2025-07-05 22:43:53] [Doors] Door 1 OPEN
+[2025-07-05 22:43:53] [Doors] Door 2 OPEN
+[2025-07-05 22:43:55] [System] Launching main sequence...
+[2025-07-05 22:43:55] [Doors] Set Door 1 → CLOSED
+[2025-07-05 22:43:55] [Doors] Set Door 2 → CLOSED
+[2025-07-05 22:43:55] [Arduino] (Simulated) m1Digital_Write(pin=13, value=0)
+[2025-07-05 22:43:55] [Arduino] (Simulated) m1Digital_Write(pin=23, value=0)
+[2025-07-05 22:43:55] [Arduino] (Simulated) m1Digital_Write(pin=25, value=0)
+[2025-07-05 22:43:55] [Doors] Door 2 closing...
+[2025-07-05 22:43:55] [Doors] Door 1 closing...
+[2025-07-05 22:43:55] House is already active. Please stop the house before attemping to re-start it.

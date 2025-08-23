@@ -1,0 +1,132 @@
+# control/shutdown.py
+import time as t
+from utils.tools import log_event
+from context import house
+from control.houseLights import toggleHouseLights
+from control.audio_manager import play_to_all_channels
+from control.arduino import m1Digital_Write, m2Digital_Write
+
+def shutdown():
+    log_event("[Shutdown] Executing shutdown routine...")
+    play_to_all_channels("shutdown activated")
+
+    house.HouseActive = False
+    house.testing = False
+
+    log_event("SHUTDOWN - MAIN:")
+    m2Digital_Write(48, 0)
+    log_event("Audio mixer OFF")
+    m2Digital_Write(47, 0)
+    log_event("Smoke Machine OFF")
+
+    log_event("SHUTDOWN - CAVE ROOM:")
+    m1Digital_Write(54, 0)
+    log_event("CR Air Blast 4 OFF")
+    m1Digital_Write(27, 0)
+    log_event("CR Ambient Lights 1 OFF")
+    m1Digital_Write(35, 0)
+    log_event("CR Lightning 1 OFF")
+    m1Digital_Write(34, 0)
+    log_event("CR Lightning 2 OFF")
+    m1Digital_Write(36, 0)
+    log_event("Can Lights OFF")
+    m1Digital_Write(32, 0)
+    log_event("CR Strobe 2 OFF")
+    m1Digital_Write(30, 0)
+    log_event("CR Swamp Monster Light OFF")
+    m1Digital_Write(55, 0)
+    log_event("CR Swamp Monster Solenoid OFF")
+
+    log_event("SHUTDOWN - MIRROR ROOM:")
+    m1Digital_Write(41, 0)
+    log_event("MR Ambient Lights 2 OFF")
+    m1Digital_Write(31, 0)
+    log_event("MR Mirror Light OFF")
+
+    log_event("SHUTDOWN - SWAMP ROOM:")
+    m1Digital_Write(40, 0)
+    log_event("SR Lightning 3 OFF")
+    m1Digital_Write(24, 0)
+    log_event("SR Lightning 4 OFF")
+    m1Digital_Write(28, 0)
+    log_event("SR Lightning 5 OFF")
+    m1Digital_Write(61, 0)
+    log_event("SR Air Explosion 2 OFF")
+    m2Digital_Write(53, 0)
+    log_event("SR Swamp Lasers OFF")
+    m1Digital_Write(37, 0)
+    log_event("SR Overhang Safety OFF")
+    m1Digital_Write(62, 0)
+    log_event("Bu Forward OFF")
+    m1Digital_Write(63, 0)
+    log_event("Bu Up/Down OFF")
+
+    log_event("SHUTDOWN - MASK ROOM:")
+    m1Digital_Write(33, 0)
+    log_event("MkR Ambient Light 4 Blacklight OFF")
+    m1Digital_Write(23, 0)
+    log_event("MkR Strobe 3 OFF")
+    m1Digital_Write(59, 0)
+    log_event("MkR Air Blast 3 OFF")
+
+    log_event("SHUTDOWN - GRAVEYARD:")
+    m1Digital_Write(57, 0)
+    log_event("GY Rock Spider Solenoid OFF")
+
+    t.sleep(1)
+    toggleHouseLights(True)
+
+def shutdownDetector():
+    from control.system import initialize_system
+    
+    while house.systemState == "ONLINE":
+        t.sleep(1)
+
+    t.sleep(4)
+
+    if house.systemState == "EmergencyShutoff":
+        log_event("EMERGENCY SHUTDOWN DETECTED - Please type keyword 'SAFE' into terminal to return to standby mode.")
+        play_to_all_channels("emergency shutdown activated")
+        shutdown()
+        for _ in range(3):
+            toggleHouseLights(True)
+            t.sleep(0.25)
+            toggleHouseLights(False)
+            t.sleep(0.25)
+        house.testing = False
+        while True:
+            input1 = input().upper()
+            if input1 == "SAFE":
+                for a in range(5, 0, -1):
+                    log_event(f"Returning to standby in {a} seconds.")
+                    t.sleep(1)
+                initialize_system()
+                break
+            else:
+                log_event("Invalid command. Please type keyword 'SAFE' into terminal to return to standby mode.")
+
+    elif house.systemState == "SoftShutdown":
+        log_event("SOFT SHUTDOWN DETECTED - Systems will be restarted to standby.")
+        play_to_all_channels("soft shutdown activated")
+        shutdown()
+        for _ in range(3):
+            toggleHouseLights(True)
+            t.sleep(0.25)
+            toggleHouseLights(False)
+            t.sleep(0.25)
+        house.testing = False
+        for a in range(5, 0, -1):
+            log_event(f"Returning to standby in {a} seconds.")
+            t.sleep(1)
+        initialize_system()
+
+    else:
+        log_event("Shutdown ID unknown - Please type keyword 'SAFE' into terminal to return to standby mode.")
+        house.testing = False
+        while True:
+            input1 = input().upper()
+            if input1 == "SAFE":
+                initialize_system()
+                break
+            else:
+                log_event("Invalid command. Please type keyword 'SAFE' into terminal to return to standby mode.")
