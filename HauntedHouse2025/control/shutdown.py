@@ -93,7 +93,6 @@ def shutdownDetector():
             t.sleep(0.25)
             toggleHouseLights(False)
             t.sleep(0.25)
-        house.testing = False
         while True:
             input1 = input().upper()
             if input1 == "SAFE":
@@ -114,7 +113,6 @@ def shutdownDetector():
             t.sleep(0.25)
             toggleHouseLights(False)
             t.sleep(0.25)
-        house.testing = False
         for a in range(5, 0, -1):
             log_event(f"Returning to standby in {a} seconds.")
             t.sleep(1)
@@ -122,7 +120,7 @@ def shutdownDetector():
 
     else:
         log_event("Shutdown ID unknown - Please type keyword 'SAFE' into terminal to return to standby mode.")
-        house.testing = False
+        shutdown()
         while True:
             input1 = input().upper()
             if input1 == "SAFE":

@@ -8,7 +8,7 @@ def run():
 
     while house.HouseActive or house.Demo:
         print("[Graveyard] Running loop...")
-        play_to_named_channel("cannon.wav", "dungeon")
+        play_to_named_channel("cannon1.wav", "dungeon")
         t.sleep(10)
 
         if not house.HouseActive and not house.Demo:

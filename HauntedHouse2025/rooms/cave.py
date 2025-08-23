@@ -16,7 +16,7 @@ def run():
             # Sensor or demo trigger
             if m2Read_Analog(7) > 200 or house.Demo:
                 setDoorState(1, "CLOPEN")
-                play_to_named_channel("cannon1.wav", "frontLeft")
+                #play_to_named_channel("cannon1.wav", "frontLeft")
                 m1Digital_Write(27, 1)  # Start animatronic
                 log_event("[CaveRoom] Activated animatronic 27")
                 t.sleep(5)

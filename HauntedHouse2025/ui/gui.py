@@ -24,7 +24,7 @@ def demoEvent(room):
     elif room == 'MkR':
         threading.Thread(target=mask.run, args=(house,)).start()
 
-def change_state(new_state):
+def change_system_state(new_state):
     house.systemState = new_state
 
 def MainGUI():
@@ -40,9 +40,9 @@ def MainGUI():
     tk.Label(root, text="DEMO CONTROLS", font=("Helvetica bold", 15), bg="orange").place(x=25, y=395)
     tk.Label(root, text="ADVANCED CONTROLS", font=("Helvetica bold", 15), bg="orange").place(x=25, y=535)
 
-    tk.Button(root, text="START HAUNTED HOUSE", height=3, width=25, bg="turquoise1", command=StartHouse).place(x=250, y=50)
-    tk.Button(root, text="EMERGENCY SHUTOFF", height=3, width=25, bg="red", command=lambda: change_state("EmergencyShutoff")).place(x=25, y=50)
-    tk.Button(root, text="SOFT SHUTDOWN", height=3, width=25, bg="yellow", command=lambda: change_state("SoftShutdown")).place(x=25, y=125)
+    tk.Button(root, text="START HAUNTED HOUSE", height=3, width=25, bg="turquoise1", command=lambda: threading.Thread(target=StartHouse, daemon=True).start()).place(x=250, y=50)
+    tk.Button(root, text="EMERGENCY SHUTOFF", height=3, width=25, bg="red", command=lambda: change_system_state("EmergencyShutoff")).place(x=25, y=50)
+    tk.Button(root, text="SOFT SHUTDOWN", height=3, width=25, bg="yellow", command=lambda: change_system_state("SoftShutdown")).place(x=25, y=125)
 
     tk.Button(root, text="Open Door 1", height=2, width=15, command=lambda: setDoorState(1, "OPEN")).place(x=25, y=235)
     tk.Button(root, text="Close Door 1", height=2, width=15, command=lambda: setDoorState(1, "CLOSED")).place(x=150, y=235)

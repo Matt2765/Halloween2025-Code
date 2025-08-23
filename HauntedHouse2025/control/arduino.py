@@ -1,6 +1,7 @@
 # control/arduino.py
 from pymata4 import pymata4
 from utils.tools import log_event
+from context import house
 
 try:
     board = pymata4.Pymata4()
@@ -28,9 +29,12 @@ def m2Digital_Write(pin, value):
 
 def m2Read_Analog(pin):
     if arduino_available:
+        if house.DEBUG_INFO == True:
+            log_event(f"[Arduino] m2Read_Analog(pin={pin}) returning {board.analog_read(pin)[0]}")
         return board.analog_read(pin)[0]
     else:
-        log_event(f"[Arduino] (Simulated) m2Read_Analog(pin={pin}) returning 0")
+        if house.DEBUG_INFO == True:
+            log_event(f"[Arduino] (Simulated) m2Read_Analog(pin={pin}) returning 0")
         return 0
 
 

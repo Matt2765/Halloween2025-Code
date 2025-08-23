@@ -10,7 +10,7 @@ def run():
 
     while house.HouseActive or house.Demo:
         print("[MaskRoom] Running loop...")
-        play_to_named_channel("cannon1.wav", "closetCreak")
+        #play_to_named_channel("cannon1.wav", "closetCreak")
         t.sleep(5)
 
         if not house.HouseActive and not house.Demo:
