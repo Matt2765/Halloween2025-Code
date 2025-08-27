@@ -99,7 +99,7 @@ def shutdownDetector():
                 for a in range(5, 0, -1):
                     log_event(f"Returning to standby in {a} seconds.")
                     t.sleep(1)
-                initialize_system()
+                house.systemState = "REBOOT"
                 break
             else:
                 log_event("Invalid command. Please type keyword 'SAFE' into terminal to return to standby mode.")
@@ -116,7 +116,7 @@ def shutdownDetector():
         for a in range(5, 0, -1):
             log_event(f"Returning to standby in {a} seconds.")
             t.sleep(1)
-        initialize_system()
+        house.systemState = "REBOOT"
 
     else:
         log_event("Shutdown ID unknown - Please type keyword 'SAFE' into terminal to return to standby mode.")
@@ -124,7 +124,7 @@ def shutdownDetector():
         while True:
             input1 = input().upper()
             if input1 == "SAFE":
-                initialize_system()
+                house.systemState = "REBOOT"
                 break
             else:
                 log_event("Invalid command. Please type keyword 'SAFE' into terminal to return to standby mode.")
