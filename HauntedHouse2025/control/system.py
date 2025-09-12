@@ -18,35 +18,32 @@ from rooms import cave, mirror, swamp, mask, graveyard
 from control.doors import spawn_doors
 
 def initialize_system():
-    log_event("[System] Initializing haunted house...")
+    while house.systemState == "ONLINE":
+        if house.Boot:
+            log_event("[System] Initializing haunted house...")
 
-    # Initialize hardware
-    connectArduino()
-    
-    t.sleep(1)
-
-    # Launch core services
-    threading.Thread(target=HTTP_SERVER, daemon=True).start()
-    threading.Thread(target=MainGUI, daemon=True).start()
-    # threading.Thread(target=analog_update_loop, daemon=True).start() # Commented out because hoping to use only remote sensors
-    _, house.remote_sensor_value = remote_sensor_monitor.start_sensor_listener()
-    spawn_doors()
-
-    t.sleep(0.2)
-    log_event("[System] Initialization complete. System is ONLINE.")
-    house.systemState = "ONLINE"
-    
-    threading.Thread(target=shutdownDetector, daemon=True).start()
-    
-    while True:
-        if house.systemState != "ONLINE":
-            #while house.systemState != "ONLINE":    # wait until system is back online, so program doesnt completely stop
-            #    t.sleep(1)
-            break
-        else:
-            t.sleep(1)
+            # Initialize hardware
+            connectArduino()
             
-    log_event("[System] All services stopped. Most likely due to shutdown.")
+            t.sleep(1)
+
+            # Launch core services
+            threading.Thread(target=HTTP_SERVER, daemon=True).start()
+            threading.Thread(target=MainGUI, daemon=True).start()
+            # threading.Thread(target=analog_update_loop, daemon=True).start() # Commented out because hoping to use only remote sensors
+            _, house.remote_sensor_value = remote_sensor_monitor.start_sensor_listener()
+            spawn_doors()
+
+            t.sleep(0.2)
+            log_event("[System] Initialization complete. System is ONLINE.")
+            house.systemState = "ONLINE"
+            
+            threading.Thread(target=shutdownDetector, daemon=True).start()
+        
+        while house.systemState == "OFFLINE":
+            t.sleep(1)
+                
+        log_event("[System] All services stopped. Most likely due to shutdown.")
 
 
 def StartHouse():

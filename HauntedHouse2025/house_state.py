@@ -1,6 +1,7 @@
 # house_state.py
 class HouseState:
     def __init__(self):
+        self.Boot = True
         self.HouseActive = False
         self.systemState = "OFFLINE"
         self.Demo = False
