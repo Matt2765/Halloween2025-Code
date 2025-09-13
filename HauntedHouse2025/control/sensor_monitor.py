@@ -13,7 +13,7 @@ def analog_update_loop():
             for pin in range(len(house.M2AnalogValues)):
                 value = m2Read_Analog(pin)
                 house.M2AnalogValues[pin] = value
-            time.sleep(0.1)  # adjust for responsiveness vs. CPU load
+            time.sleep(0.2)  # adjust for responsiveness vs. CPU load
     except Exception as e:
         log_event(f"[Sensor] Error in analog update loop: {e}")
 

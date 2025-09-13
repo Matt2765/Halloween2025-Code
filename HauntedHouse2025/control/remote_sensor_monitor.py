@@ -1,7 +1,8 @@
 # control/remote_sensor_monitor.py
 import socket
 import threading
-import time
+import time as t
+from utils.tools import log_event
 
 UDP_IP = "0.0.0.0"
 UDP_PORT = 4210
@@ -30,7 +31,7 @@ def remote_sensor_value(sensor_id):
 def listen_for_data():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((UDP_IP, UDP_PORT))
-    print(f"Listening for ESP32 sensor data on {UDP_IP}:{UDP_PORT}")
+    log_event(f"[Remote Sensor] Listening for ESP32 sensor data on {UDP_IP}:{UDP_PORT}")
     while True:
         try:
             data, _ = sock.recvfrom(BUFFER_SIZE)
@@ -39,7 +40,7 @@ def listen_for_data():
             if parsed:
                 sensor_data[parsed['sensor_id']] = parsed
         except Exception as e:
-            print(f"[Sensor] Error: {e}")
+            log_event(f"[Remote Sensor] Error: {e}")
 
 def start_sensor_listener():
     thread = threading.Thread(target=listen_for_data, daemon=True)

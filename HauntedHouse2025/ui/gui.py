@@ -30,6 +30,8 @@ def change_system_state(new_state):
 def MainGUI():
     from control.system import StartHouse
     
+    log_event(f"[GUI] Booting main GUI...")
+    
     root = tk.Tk()
     root.configure(background="orange")
     root.title("Halloween 2025 Control Panel")

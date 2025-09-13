@@ -18,9 +18,9 @@ from rooms import cave, mirror, swamp, mask, graveyard
 from control.doors import spawn_doors
 
 def initialize_system():
-    while house.systemState == "ONLINE":
+    while True:
         if house.Boot:
-            log_event("[System] Initializing haunted house...")
+            log_event("[System] Initializing persistent services...")
 
             # Initialize hardware
             connectArduino()
@@ -30,21 +30,27 @@ def initialize_system():
             # Launch core services
             threading.Thread(target=HTTP_SERVER, daemon=True).start()
             threading.Thread(target=MainGUI, daemon=True).start()
-            # threading.Thread(target=analog_update_loop, daemon=True).start() # Commented out because hoping to use only remote sensors
-            _, house.remote_sensor_value = remote_sensor_monitor.start_sensor_listener()
-            spawn_doors()
-
-            t.sleep(0.2)
-            log_event("[System] Initialization complete. System is ONLINE.")
-            house.systemState = "ONLINE"
             
-            threading.Thread(target=shutdownDetector, daemon=True).start()
-        
-        while house.systemState == "OFFLINE":
-            t.sleep(1)
-                
-        log_event("[System] All services stopped. Most likely due to shutdown.")
+        log_event("[System] Initializing non-persistent services...")
 
+        # threading.Thread(target=analog_update_loop, daemon=True).start() # Commented out because hoping to use only remote sensors
+        _, house.remote_sensor_value = remote_sensor_monitor.start_sensor_listener()
+                
+        spawn_doors()
+
+        t.sleep(0.2)
+        house.systemState = "ONLINE"
+        log_event("[System] Initialization complete. System is ONLINE.")
+            
+        threading.Thread(target=shutdownDetector, daemon=True).start()
+        
+        while house.systemState == "ONLINE":
+            t.sleep(1)
+        
+        log_event("[System] All non-persistent services stopped. Most likely due to shutdown.")
+            
+        while house.systemState != "REBOOT":
+            t.sleep(1) 
 
 def StartHouse():
     if not house.HouseActive and house.systemState == "ONLINE":
@@ -72,6 +78,6 @@ def StartHouse():
         log_event("[System] Main sequence ended.")
     else:
         if not house.HouseActive and house.systemState != "ONLINE":
-            log_event("Cannot start house while it is in a shutdown state.")
+            log_event("[System] Cannot start house while it is in a shutdown state.")
         else:
-            log_event("House is already active. Please stop the house before attemping to re-start it.")
+            log_event("[System] House is already active. Please stop the house before attemping to re-start it.")

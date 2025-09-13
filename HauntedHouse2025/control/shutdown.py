@@ -77,12 +77,10 @@ def shutdown():
     toggleHouseLights(True)
 
 def shutdownDetector():
-    from control.system import initialize_system
-    
     while house.systemState == "ONLINE":
         t.sleep(1)
 
-    t.sleep(4)
+    t.sleep(1)
 
     if house.systemState == "EmergencyShutoff":
         log_event("EMERGENCY SHUTDOWN DETECTED - Please type keyword 'SAFE' into terminal to return to standby mode.")

@@ -229,16 +229,19 @@ def connectArduino():
         M1 = pymata4.Pymata4(
             com_port=M1PORT, baud_rate=250000, sleep_tune=0.05)
         print(f"Communication to board on {M1PORT} successfully started.")
-    except:
-        print(f"Board not found on {M1PORT}. Connection not established.")
-        M1 = False
+        M1_available = True
+    except Exception as e:
+        print(f"Board not found on {M1PORT}. Connection not established.  [{e}]")
+        M1_available = False
 
     try:
         M2 = pymata4.Pymata4(com_port=M2PORT, baud_rate=250000, sleep_tune=.05)
         print(f"Communication to board on {M2PORT} successfully started.")
-    except:
-        print(f"Board not found on {M2PORT}. Connection not established.")
-        M2 = False
+        M2_available = True
+    except Exception as e:
+        print(f"Board not found on {M2PORT}. Connection not established. [{e}]")
+        M2_available = False
+        
     try:
         for i in range(1, 71):  # Sets all digital pins as outputs for M1
             #  if i == 14 or i == 15:      #Pins we do not want to edit
@@ -250,8 +253,9 @@ def connectArduino():
             if i == 13:
                 i = 44
             M1.set_pin_mode_servo(i)
-    except:
-        print("Board M1 not connected, skipping pin configuration.")
+    except Exception as e:
+        print(f"Board M1 not connected, skipping pin configuration. [{e}]")
+        
     try:
         for i in range(1, 54):  # Sets all digital pins as outputs for M2
             if i == 14 or i == 15:  # Pins we do not want to edit
@@ -264,8 +268,8 @@ def connectArduino():
             M2.disable_analog_reporting(i)
         for i in range(8):  # Enable ONLY necessary sensors that need to be monitored constantly
             M2.enable_analog_reporting(i)
-    except:
-        print("Board M1 not connected, skipping pin configuration.")
+    except Exception as e:
+        print(f"Board M2 not connected, skipping pin configuration. [{e}]")
 
     t.sleep(1)  # Allows everything to boot properly
 

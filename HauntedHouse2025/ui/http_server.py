@@ -54,6 +54,7 @@ class HalloweenHTTP(BaseHTTPRequestHandler):
         self.wfile.write(bytes(f"<html><body><h1>Received {message}</h1></body></html>", "utf-8"))
 
 def HTTP_SERVER():
+    log_event(f"[HTTP] Attempting to host server at http://{HOST}:{PORT}")
     server = HTTPServer((HOST, PORT), HalloweenHTTP)
     log_event(f"[HTTP] Server started at http://{HOST}:{PORT}")
     try:
