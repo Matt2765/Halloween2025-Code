@@ -4,7 +4,7 @@ import threading
 import multiprocessing
 
 from context import house
-from control.audio_manager import play_to_named_channel
+from control.audio_manager import play_to_named_channel_async, play_to_all_channels_async
 from control.arduino import connectArduino, m2Digital_Write
 from control.shutdown import shutdownDetector
 from control.doors import setDoorState
@@ -31,6 +31,8 @@ def initialize_system():
             threading.Thread(target=HTTP_SERVER, daemon=True).start()
             threading.Thread(target=MainGUI, daemon=True).start()
             
+            house.Boot = False
+            
         log_event("[System] Initializing non-persistent services...")
 
         # threading.Thread(target=analog_update_loop, daemon=True).start() # Commented out because hoping to use only remote sensors
@@ -44,6 +46,8 @@ def initialize_system():
             
         threading.Thread(target=shutdownDetector, daemon=True).start()
         
+        t.sleep(1)
+        
         while house.systemState == "ONLINE":
             t.sleep(1)
         
@@ -54,6 +58,7 @@ def initialize_system():
 
 def StartHouse():
     if not house.HouseActive and house.systemState == "ONLINE":
+        play_to_all_channels_async("starting house")
         log_event("[System] Launching main sequence...")
         house.HouseActive = True
 
@@ -61,13 +66,42 @@ def StartHouse():
         setDoorState(2, "CLOSED")
         toggleHouseLights(False)
 
-        threading.Thread(target=graveyard.run, args=(), daemon=True).start()
+        threading.Thread(
+            target=graveyard.run, 
+            args=(), 
+            daemon=True,
+            name="graveyard"
+        ).start()
+        
         t.sleep(5)
 
-        threading.Thread(target=cave.run, args=(), daemon=True).start()
-        threading.Thread(target=mirror.run, args=(), daemon=True).start()
-        threading.Thread(target=swamp.run, args=(), daemon=True).start()
-        threading.Thread(target=mask.run, args=(), daemon=True).start()
+        threading.Thread(
+            target=cave.run, 
+            args=(), 
+            daemon=True, 
+            name="caveRoom"
+        ).start()
+        
+        threading.Thread(
+            target=mirror.run, 
+            args=(), 
+            daemon=True, 
+            name="mirrorRoom"
+        ).start()
+        
+        threading.Thread(
+            target=swamp.run, 
+            args=(), 
+            daemon=True, 
+            name="swampRoom"
+        ).start()
+        
+        threading.Thread(
+            target=mask.run, 
+            args=(), 
+            daemon=True, 
+            name="maskRoom"
+        ).start()
 
         while house.HouseActive:
             if BreakCheck():

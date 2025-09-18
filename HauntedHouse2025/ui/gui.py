@@ -6,7 +6,6 @@ from control.shutdown import shutdown
 from control.doors import setDoorState
 from control.houseLights import toggleHouseLights
 from utils.tools import log_event
-from control.audio_manager import play_to_named_channel
 
 def demoEvent(room):
     house.Demo = True

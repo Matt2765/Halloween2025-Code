@@ -1,7 +1,7 @@
 # rooms/swamp.py
 import time as t
 from context import house
-from control.audio_manager import play_to_named_channel
+from control.audio_manager import play_to_named_channel_async
 
 def run():
     print("[SwampRoom] Starting...")
@@ -11,7 +11,7 @@ def run():
 
     while house.HouseActive or house.Demo:
         print("[SwampRoom] Running loop...")
-        #play_to_named_channel("cannon1.wav", "swampRoom")
+        #play_to_named_channel_async("cannon1.wav", "swampRoom")
         t.sleep(5)
 
         if not house.HouseActive and not house.Demo:

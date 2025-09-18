@@ -3,6 +3,7 @@ import socket
 import threading
 import time as t
 from utils.tools import log_event
+from context import house
 
 UDP_IP = "0.0.0.0"
 UDP_PORT = 4210
@@ -32,7 +33,7 @@ def listen_for_data():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((UDP_IP, UDP_PORT))
     log_event(f"[Remote Sensor] Listening for ESP32 sensor data on {UDP_IP}:{UDP_PORT}")
-    while True:
+    while house.systemState == "ONLINE":
         try:
             data, _ = sock.recvfrom(BUFFER_SIZE)
             message = data.decode("utf-8")
