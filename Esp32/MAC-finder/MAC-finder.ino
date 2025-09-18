@@ -20,7 +20,7 @@ void setup() {
   delay(1000);
 
   // Print MAC Address to Serial monitor
-  Serial.print("MAC Address: ");
+  Serial.log_event("MAC Address: ");
   Serial.println(WiFi.macAddress());
 }
 

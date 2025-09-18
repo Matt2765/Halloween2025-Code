@@ -2,13 +2,14 @@
 import time as t
 from context import house
 from control.audio_manager import play_to_named_channel_async
+from utils.tools import BreakCheck, log_event
 
 def run():
-    print("[MirrorRoom] Starting...")
+    log_event("[MirrorRoom] Starting...")
     house.MRstate = "ACTIVE"
 
     while house.HouseActive or house.Demo:
-        print("[MirrorRoom] Running loop...")
+        log_event("[MirrorRoom] Running loop...")
         #play_to_named_channel_async("cannon1.wav", "atticSpeaker")
         t.sleep(5)
 
@@ -16,4 +17,4 @@ def run():
             break
 
     house.MRstate = "INACTIVE"
-    print("[MirrorRoom] Exiting.")
+    log_event("[MirrorRoom] Exiting.")

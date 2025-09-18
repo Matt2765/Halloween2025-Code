@@ -2,15 +2,16 @@
 import time as t
 from context import house
 from control.audio_manager import play_to_named_channel_async
+from utils.tools import BreakCheck, log_event
 
 def run():
-    print("[SwampRoom] Starting...")
+    log_event("[SwampRoom] Starting...")
     house.SRstate = "ACTIVE"
 
-    print(f'[SwampRoom] REMOTE_TEST: {house.remote_sensor_value("TOF1")}')
+    log_event(f'[SwampRoom] REMOTE_TEST: {house.remote_sensor_value("TOF1")}')
 
     while house.HouseActive or house.Demo:
-        print("[SwampRoom] Running loop...")
+        log_event("[SwampRoom] Running loop...")
         #play_to_named_channel_async("cannon1.wav", "swampRoom")
         t.sleep(5)
 
@@ -18,4 +19,4 @@ def run():
             break
 
     house.SRstate = "INACTIVE"
-    print("[SwampRoom] Exiting.")
+    log_event("[SwampRoom] Exiting.")

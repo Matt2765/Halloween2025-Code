@@ -2,17 +2,17 @@
 import time as t
 from context import house
 from control.audio_manager import play_to_named_channel_async
-from utils.tools import BreakCheck
+from utils.tools import BreakCheck, log_event
 import random
 import threading
 
 Scripted_Event = False
 
 def run():
-    print("[Graveyard] Starting...")
+    log_event("[Graveyard] Starting...")
 
     while house.HouseActive or house.Demo:
-        print("[Graveyard] Running loop...")
+        log_event("[Graveyard] Running loop...")
         MedallionCallsEvent()
         
         for i in range(30):
@@ -23,13 +23,15 @@ def run():
         if not house.HouseActive and not house.Demo:
             break
 
-    print("[Graveyard] Exiting.")
+    log_event("[Graveyard] Exiting.")
     
 def MedallionCallsEvent():
     global Scripted_Event 
     Scripted_Event = True
     
-    play_to_named_channel_async("TheMedallionCalls.wav", "graveyard", gain_override=.1)
+    log_event("[Graveyard] Medallion Calls Event Starting...")
+    
+    play_to_named_channel_async("TheMedallionCalls.wav", "graveyard", gain_override=.6)
         
     for i in range(17):
         t.sleep(1)

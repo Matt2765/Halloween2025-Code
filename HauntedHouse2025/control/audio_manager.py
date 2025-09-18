@@ -30,7 +30,7 @@ named_channels: Dict[str, Dict[str, float | int]] = {
 }
 
 DEFAULT_SOUND_DIR = (Path(__file__).resolve().parents[3] / "Assets" / "SoundDir").resolve()
-DEFAULT_DEVICE_INDEX: Optional[int] = 38  # your 7.1 card index
+DEFAULT_DEVICE_INDEX: Optional[int] = 50  # 38 IS THE 7.1 CARD INDEX
 DEFAULT_TOTAL_CHANNELS = 8
 
 

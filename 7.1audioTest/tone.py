@@ -32,7 +32,7 @@ def speak_to_wav(text, filename):
 
 def play_label_on_channel(label_name):
     if label_name not in named_channels:
-        print(f"Unknown channel: {label_name}")
+        log_event(f"Unknown channel: {label_name}")
         return
 
     ch_index = named_channels[label_name]["index"]
@@ -47,7 +47,7 @@ def play_label_on_channel(label_name):
         data = np.expand_dims(data, axis=1)
 
     if fs != sample_rate:
-        print(f"Sample rate mismatch: {fs} != {sample_rate}")
+        log_event(f"Sample rate mismatch: {fs} != {sample_rate}")
         # Manually resample to 44.1kHz
         duration = len(data) / fs
         new_length = int(duration * sample_rate)
@@ -59,7 +59,7 @@ def play_label_on_channel(label_name):
     output = np.zeros((len(data), total_channels), dtype='float32')
     output[:, ch_index] = data[:, 0] * gain
 
-    print(f"🔈 Playing '{label_name}' on channel {ch_index} (gain={gain}) | shape: {output.shape}, fs: {fs}")
+    log_event(f"🔈 Playing '{label_name}' on channel {ch_index} (gain={gain}) | shape: {output.shape}, fs: {fs}")
     sd.play(output, samplerate=fs, device=device_index)
     sd.wait()
 
@@ -71,7 +71,7 @@ try:
             time.sleep(delay_between)
 
 except KeyboardInterrupt:
-    print("Speaker test stopped.")
+    log_event("Speaker test stopped.")
 finally:
     if os.path.exists(temp_wav_path):
         os.remove(temp_wav_path)

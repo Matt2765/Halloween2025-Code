@@ -2,10 +2,11 @@
 import time
 from control.doors import setDoorState
 from control.arduino import m2Read_Analog
+from utils.tools import log_event
 
 
 def debugDoors():
-    print("[Debug] Toggling doors...")
+    log_event("[Debug] Toggling doors...")
     while True:
         setDoorState(1, "OPEN")
         time.sleep(1)
@@ -14,8 +15,8 @@ def debugDoors():
 
 
 def debugSensors():
-    print("[Debug] Reading analog sensors...")
+    log_event("[Debug] Reading analog sensors...")
     while True:
         val = m2Read_Analog(7)
-        print(f"[Debug] Sensor value: {val}")
+        log_event(f"[Debug] Sensor value: {val}")
         time.sleep(1)
