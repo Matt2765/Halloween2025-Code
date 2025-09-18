@@ -20,7 +20,8 @@ def run():
             if BreakCheck():
                 return
 
-        if not house.HouseActive and not house.Demo:
+        if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
+            house.Demo = False
             break
 
     log_event("[Graveyard] Exiting.")
@@ -136,7 +137,7 @@ def randAttackerCannons():
     audioFiles = ["CannonFireLow01.wav", 
                   "CannonFireLow02.wav", 
                   "CannonFireLow04.wav"]
-    while Scripted_Event:
+    while Scripted_Event and house.HouseActive:
         audio = random.choice(audioFiles)
         play_to_named_channel_async(f"{audio}", "graveyard", gain_override=.2)
         t.sleep(random.uniform(.2, 5))

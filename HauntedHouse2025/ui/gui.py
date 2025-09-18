@@ -13,15 +13,17 @@ def demoEvent(room):
     toggleHouseLights(False)
     log_event(f"[GUI] Starting demo of {room}")
 
-    from rooms import cave, mirror, swamp, mask
+    from rooms import cave, mirror, swamp, mask, graveyard
     if room == 'CR':
-        threading.Thread(target=cave.run, args=(house,)).start()
+        threading.Thread(target=cave.run, args=()).start()
     elif room == 'MR':
-        threading.Thread(target=mirror.run, args=(house,)).start()
+        threading.Thread(target=mirror.run, args=()).start()
     elif room == 'SR':
-        threading.Thread(target=swamp.run, args=(house,)).start()
+        threading.Thread(target=swamp.run, args=()).start()
     elif room == 'MkR':
-        threading.Thread(target=mask.run, args=(house,)).start()
+        threading.Thread(target=mask.run, args=()).start()
+    elif room == 'GY':
+        threading.Thread(target=graveyard.run, args=()).start()
 
 def change_system_state(new_state):
     house.systemState = new_state
@@ -54,6 +56,7 @@ def MainGUI():
 
     tk.Button(root, text="Demo Cave Room", height=2, width=15, command=lambda: demoEvent('CR')).place(x=150, y=430)
     tk.Button(root, text="Demo Swamp Room", height=2, width=15, command=lambda: demoEvent('SR')).place(x=25, y=430)
+    tk.Button(root, text="Demo Graveyard", height=2, width=15, command=lambda: demoEvent('GY')).place(x=275, y=430)
     tk.Button(root, text="Demo Mirror Room", height=2, width=15, command=lambda: demoEvent("MR")).place(x=25, y=480)
     tk.Button(root, text="Demo Mask Room", height=2, width=15, command=lambda: demoEvent("MkR")).place(x=150, y=480)
 

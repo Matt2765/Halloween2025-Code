@@ -1,6 +1,7 @@
 # control/lights.py
 from context import house
 from control.arduino import m1Digital_Write
+from utils.tools import log_event
 
 
 def toggleHouseLights(enable: bool):

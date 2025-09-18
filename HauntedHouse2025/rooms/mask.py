@@ -13,7 +13,8 @@ def run():
         #play_to_named_channel_async("cannon1.wav", "closetCreak")
         t.sleep(5)
 
-        if not house.HouseActive and not house.Demo:
+        if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
+            house.Demo = False
             break
 
     house.MkRstate = "INACTIVE"

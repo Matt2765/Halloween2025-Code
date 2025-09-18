@@ -27,7 +27,8 @@ def run():
                 if house.Demo:
                     break
 
-            if BreakCheck():
+            if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
+                house.Demo = False
                 break
 
             t.sleep(0.5)
