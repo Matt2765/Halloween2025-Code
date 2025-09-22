@@ -10,9 +10,9 @@ def convert_mp3_to_wav(folder_path):
             try:
                 sound = AudioSegment.from_mp3(mp3_path)
                 sound.export(wav_path, format="wav")
-                log_event(f"Converted: {filename} -> {os.path.basename(wav_path)}")
+                print(f"Converted: {filename} -> {os.path.basename(wav_path)}")
             except Exception as e:
-                log_event(f"Failed to convert {filename}: {e}")
+                print(f"Failed to convert {filename}: {e}")
 
 def main():
     root = Tk()
@@ -21,7 +21,7 @@ def main():
     if folder_selected:
         convert_mp3_to_wav(folder_selected)
     else:
-        log_event("No folder selected.")
+        print("No folder selected.")
 
 if __name__ == "__main__":
     main()
