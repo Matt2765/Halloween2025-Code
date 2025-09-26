@@ -17,8 +17,8 @@ import multiprocessing
 def main():
     def init():
         global HouseActive  # WHEN TRUE HOUSE IS FULLY OPERATIONAL
-        global CRstate
-        global MRstate
+        global TRstate
+        global TRstate
         global MkRstate
         global SRstate
         global systemState  # IF ONLINE, HOUSE IS READY TO BE STARTED, IF SoftShutdown or EmergencyShutoff, HOUSE IS NOT READY
@@ -39,8 +39,8 @@ def main():
         HouseActive = False
         FRthreadRunning = False
         SOUND = True
-        CRstate = "INACTIVE"
-        MRstate = "INACTIVE"
+        TRstate = "INACTIVE"
+        TRstate = "INACTIVE"
         SRstate = "INACTIVE"
         MkRstate = "INACTIVE"
 
@@ -99,10 +99,10 @@ def main():
 
         t.sleep(5)
 
-        threading.Thread(target=CaveRoom).start()
-        threading.Thread(target=MirrorRoom).start()
+        threading.Thread(target=gangway).start()
+        threading.Thread(target=treasureRoom).start()
         threading.Thread(target=SwampRoom).start()
-        threading.Thread(target=MaskRoom).start()
+        threading.Thread(target=cargoHold).start()
 
         m2Digital_Write(53, 1)
         print("SR Swamp Lasers ON")
@@ -159,29 +159,29 @@ def shutdown():  # MAIN SHUTDOWN FUNCTION, ALSO REFERENCE FOR ALL HOUSE COMPONEN
     m2Digital_Write(47, 0)
     print("Smoke Machine OFF")
 
-    print("SHUTDOWN - CAVE ROOM:")
+    print("SHUTDOWN - gangway:")
     m1Digital_Write(54, 0)
-    print("CR Air Blast 4 OFF")
+    print("TR Air Blast 4 OFF")
     m1Digital_Write(27, 0)
-    print("CR Ambient Lights 1 OFF")
+    print("TR Ambient Lights 1 OFF")
     m1Digital_Write(35, 0)
-    print("CR Lightning 1 OFF")
+    print("TR Lightning 1 OFF")
     m1Digital_Write(34, 0)
-    print("CR Lightning 2 OFF")
+    print("TR Lightning 2 OFF")
     m1Digital_Write(36, 0)
     print("Can Lights OFF")
     m1Digital_Write(32, 0)
-    print("CR Strobe 2 OFF")
+    print("TR Strobe 2 OFF")
     m1Digital_Write(30, 0)
-    print("CR Swamp Monster Light OFF")
+    print("TR Swamp Monster Light OFF")
     m1Digital_Write(55, 0)
-    print("CR Swamp Monster Solenoid OFF")
+    print("TR Swamp Monster Solenoid OFF")
 
-    print("SHUTDOWN - MIRROR ROOM:")
+    print("SHUTDOWN - TREASURE ROOM:")
     m1Digital_Write(41, 0)
-    print("MR Ambient Lights 2 OFF")
+    print("TR Ambient Lights 2 OFF")
     m1Digital_Write(31, 0)
-    print("MR Mirror Light OFF")
+    print("TR Treasure Room Light OFF")
 
     print("SHUTDOWN - SWAMP ROOM:")
     m1Digital_Write(40, 0)
@@ -201,7 +201,7 @@ def shutdown():  # MAIN SHUTDOWN FUNCTION, ALSO REFERENCE FOR ALL HOUSE COMPONEN
     m1Digital_Write(63, 0)
     print("Bu Up/Down OFF")
 
-    print("SHUTDOWN - MASK ROOM:")
+    print("SHUTDOWN - CARGO HOLD:")
     m1Digital_Write(33, 0)
     print("MkR Ambient Light 4 Blacklight OFF")
     m1Digital_Write(23, 0)
@@ -461,32 +461,32 @@ def Graveyard():
     print("Ending Graveyard Sequence...")
 
 
-def CaveRoom():
-    global CRstate, Demo
-    print("Starting Cave Room Process...")
+def gangway():
+    global TRstate, Demo
+    print("Starting gangway Process...")
 
     while HouseActive or Demo:
-        CRstate = "ACTIVE"
+        TRstate = "ACTIVE"
         t.sleep(.2)
         if m2Read_Analog(7) > 200 or Demo:
-            print("Starting Cave Room Sequence...")
+            print("Starting gangway Sequence...")
             setDoorState(1, "CLOPEN")
 
-            playSound("CRintroLEFT")
+            playSound("TRintroLEFT")
             m1Digital_Write(27, 1)
-            print("CR Ambient Lights 1 ON")
+            print("TR Ambient Lights 1 ON")
 
-            threading.Thread(target=CRairBlast).start()
+            threading.Thread(target=TRairBlast).start()
 
             while m2Read_Analog(5) < 200:
                 t.sleep(.5)
                 if BreakCheck():
                     return
 
-            print("CR Swamp Monster Light ON")
+            print("TR Swamp Monster Light ON")
             for i in range(3):
                 m1Digital_Write(55, 1)
-                print("CR Swamp Monster Solenoid ON")
+                print("TR Swamp Monster Solenoid ON")
                 for i in range(5):
                     m1Digital_Write(30, 1)
                     t.sleep(.1)
@@ -495,7 +495,7 @@ def CaveRoom():
                     if BreakCheck():
                         return
                 m1Digital_Write(55, 0)
-                print("CR Swamp Monster Solenoid OFF")
+                print("TR Swamp Monster Solenoid OFF")
                 for i in range(5):
                     m1Digital_Write(30, 1)
                     t.sleep(.1)
@@ -507,12 +507,12 @@ def CaveRoom():
             t.sleep(1)
 
             m1Digital_Write(27, 0)
-            print("CR Ambient Lights 1 OFF")
+            print("TR Ambient Lights 1 OFF")
 
-            playSound("CRthunderLEFT")
+            playSound("TRthunderLEFT")
             t.sleep(.1)
 
-            print("CR Lightning 1 ON")
+            print("TR Lightning 1 ON")
             for i in range(3):
                 m1Digital_Write(35, 1)
                 t.sleep(.05)
@@ -521,16 +521,16 @@ def CaveRoom():
                 m1Digital_Write(35, 1)
                 t.sleep(.05)
                 m1Digital_Write(35, 0)
-                print("CR Lightning 1 OFF")
+                print("TR Lightning 1 OFF")
 
                 t.sleep(.1)
                 if BreakCheck():
                     return
 
-                print("CR Lightning 2 ON")
+                print("TR Lightning 2 ON")
                 m1Digital_Write(34, 1)
                 t.sleep(.2)
-                print("CR Lightning 2 OFF")
+                print("TR Lightning 2 OFF")
                 m1Digital_Write(34, 0)
 
             for i in range(3):  # WAIT
@@ -538,10 +538,10 @@ def CaveRoom():
                 if BreakCheck():
                     return
 
-            playSound("CRhitLEFT")
+            playSound("TRhitLEFT")
             t.sleep(.1)
             m1Digital_Write(32, 1)
-            print("CR Strobe 2 ON")
+            print("TR Strobe 2 ON")
 
             for i in range(4):  # WAIT
                 t.sleep(1)
@@ -549,7 +549,7 @@ def CaveRoom():
                     return
 
             m1Digital_Write(32, 0)
-            print("CR Strobe 2 OFF")
+            print("TR Strobe 2 OFF")
 
             threading.Thread(target=smokeMachine).start()
 
@@ -563,57 +563,57 @@ def CaveRoom():
                     return
 
             m1Digital_Write(27, 1)
-            print("CR Ambient Lights 1 ON")
+            print("TR Ambient Lights 1 ON")
 
-            CRstate = "INACTIVE"
+            TRstate = "INACTIVE"
             if Demo:
                 return
 
-    print("Ending Cave Room Sequence...")
-    CRstate = "INACTIVE"
+    print("Ending gangway Sequence...")
+    TRstate = "INACTIVE"
 
-def CRairBlast():
+def TRairBlast():
     t.sleep(8)
     for i in range(3):
         m1Digital_Write(54, 1)
-        print("CR Air Blast 4 ON")
+        print("TR Air Blast 4 ON")
         t.sleep(.2)
         m1Digital_Write(54, 0)
-        print("CR Air Blast 4 OFF")
+        print("TR Air Blast 4 OFF")
         t.sleep(.1)
 
 
-def MirrorRoom():
-    global MRstate, CRstate, Demo
+def treasureRoom():
+    global TRstate, TRstate, Demo
 
     while HouseActive or Demo:
-        MRstate = "ACTIVE"
+        TRstate = "ACTIVE"
         # playSound("Quip02")
 
         m1Digital_Write(41, 1)
-        print("MR Ambient Lights 2 ON")
+        print("TR Ambient Lights 2 ON")
 
         while m2Read_Analog(3) < 200:
             t.sleep(.5)
             if BreakCheck():
                 return
 
-        playMixer.put("MRhit")
+        playMixer.put("TRhit")
         t.sleep(.1)
 
-        print("MR Mirror Light ON")
+        print("TR Treasure Room Light ON")
         for i in range(10):
             m1Digital_Write(31, 1)
             t.sleep(.15)
             m1Digital_Write(31, 0)
             t.sleep(.15)
-        print("MR Mirror Light OFF")
+        print("TR Treasure Room Light OFF")
 
         if Demo:
             return
 
-    print("Ending Mirror Room Sequence...")
-    MRstate = "INACTIVE"
+    print("Ending Treasure Room Sequence...")
+    TRstate = "INACTIVE"
 
 
 def SwampRoom():
@@ -632,7 +632,7 @@ def SwampRoom():
                 threading.Thread(target=smokeMachine).start()
                 break
 
-        playMixer.put("MRswampEntrance")
+        playMixer.put("TRswampEntrance")
         playSound("swampThunderRIGHT")
         t.sleep(.1)
 
@@ -810,9 +810,9 @@ def smokeMachine():
 
         smokeSequence = 1
 
-def MaskRoom():
+def cargoHold():
     global MkRstate, Demo
-    threading.Thread(target=MaskRoomMusicLoop).start()
+    threading.Thread(target=cargoHoldMusicLoop).start()
 
     while HouseActive or Demo:
         MkRstate = "ACTIVE"
@@ -863,7 +863,7 @@ def MaskRoom():
 
     MkRstate = "INACTIVE"
 
-def MaskRoomMusicLoop():
+def cargoHoldMusicLoop():
     playMixer.put("MkRmusic")
     for i in range(53): #wait 105 seconds
         t.sleep(2)
@@ -916,21 +916,21 @@ def functionTest():
             print(f"IR FireIce {state}")
             t.sleep(.1)
 
-            print("TEST - MIRROR ROOM:")
+            print("TEST - TREASURE ROOM:")
             m1PWM_Write(2, pwmValue)
-            print(f"MR Dimmer Servo {state}")
+            print(f"TR Dimmer Servo {state}")
             t.sleep(.1)
             m1Digital_Write(34, dValue)
-            print(f"MR Dimming Light {state}")
+            print(f"TR Dimming Light {state}")
             t.sleep(.1)
             m1Digital_Write(27, dValue)
-            print(f"MR Strobe {state}")
+            print(f"TR Strobe {state}")
             t.sleep(.1)
             m1Digital_Write(35, dValue)
-            print(f"MR Creepy Light {state}")
+            print(f"TR Creepy Light {state}")
             t.sleep(.1)
             m1Digital_Write(26, dValue)
-            print(f"MR Lightning {state}")
+            print(f"TR Lightning {state}")
             t.sleep(.1)
 
             print("TEST - PIPE ROOM:")
@@ -980,13 +980,13 @@ def HTTP_SERVER():
                 DoorState[2] = "OPEN"
             elif message == "/Door2Close":
                 DoorState[2] = "CLOSED"
-            elif message == "/DemoCaveRoom":
-                demoEvent("CR")
-            elif message == "/DemoMirrorRoom":
-                demoEvent("MR")
+            elif message == "/Demogangway":
+                demoEvent("TR")
+            elif message == "/DemotreasureRoom":
+                demoEvent("TR")
             elif message == "/DemoSwampRoom":
                 demoEvent("SR")
-            elif message == "/DemoMaskRoom":
+            elif message == "/DemocargoHold":
                 demoEvent("MkR")
             elif message == "/ToggleHouseLights":
                 toggleHouseLights()
@@ -1042,19 +1042,19 @@ def MainGUI():
         root, text="SOFT SHUTDOWN", height=3, width=25, bg="yellow", command=SoftShutdown)
     btnSoftShutdown.place(x=25, y=125)
 
-    btnDemoIR = tk.Button(root, text="Demo Cave Room",
-                          height=2, width=15, command=lambda: demoEvent('CR'))
+    btnDemoIR = tk.Button(root, text="Demo gangway",
+                          height=2, width=15, command=lambda: demoEvent('TR'))
     btnDemoIR.place(x=150, y=430)
 
-    btnDemoMR = tk.Button(root, text="Demo Mirror Room",
-                          height=2, width=15, command=lambda: demoEvent("MR"))
-    btnDemoMR.place(x=25, y=480)
+    btnDemoTR = tk.Button(root, text="Demo Treasure Room",
+                          height=2, width=15, command=lambda: demoEvent("TR"))
+    btnDemoTR.place(x=25, y=480)
 
     btnDemoSR = tk.Button(root, text="Demo Swamp Room",
                           height=2, width=15, command=lambda: demoEvent('SR'))
     btnDemoSR.place(x=25, y=430)
 
-    btnDemoPR = tk.Button(root, text="Demo Mask Room",
+    btnDemoPR = tk.Button(root, text="Demo Cargo Hold",
                           height=2, width=15, command=lambda: demoEvent("MkR"))
     btnDemoPR.place(x=150, y=480)
 
@@ -1091,7 +1091,7 @@ def MainGUI():
     btnHouseLights.place(x=250, y=125)
 
     btnDF1 = tk.Button(root, text="Cycle DF Player 1", height=2,
-                       width=15, command=lambda: playMixer.put("MRswampEntrance"))
+                       width=15, command=lambda: playMixer.put("TRswampEntrance"))
     btnDF1.place(x=150, y=570)
 
     btnDF2 = tk.Button(root, text="Cycle DF Player 2", height=2,
@@ -1107,7 +1107,7 @@ def MainGUI():
     btnDF4.place(x=150, y=720)
 
     btnDF5 = tk.Button(root, text="Cycle DF Player 5", height=2,
-                       width=15, command=lambda: playMixer.put("MRhit"))
+                       width=15, command=lambda: playMixer.put("TRhit"))
     btnDF5.place(x=150, y=770)
 
     root.mainloop()
@@ -1120,15 +1120,15 @@ def demoEvent(room):
     HouseActive = True
     toggleHouseLights(False)
     print(f"Starting demo of {room}")
-    if room == 'CR':
+    if room == 'TR':
         # t.sleep(1)
-        threading.Thread(target=CaveRoom).start()
-    elif room == 'MR':
-        threading.Thread(target=MirrorRoom).start()
+        threading.Thread(target=gangway).start()
+    elif room == 'TR':
+        threading.Thread(target=treasureRoom).start()
     elif room == 'SR':
         threading.Thread(target=SwampRoom).start()
     elif room == 'MkR':
-        threading.Thread(target=MaskRoom).start()
+        threading.Thread(target=cargoHold).start()
 
     t.sleep(2)
 
@@ -1138,11 +1138,11 @@ def demoEvent(room):
 def demoEventChecker():
     global HouseActive
     global Demo
-    while (CRstate == "ACTIVE" or MRstate == "ACTIVE" or MkRstate == "ACTIVE" or SRstate == "ACTIVE"):
+    while (TRstate == "ACTIVE" or TRstate == "ACTIVE" or MkRstate == "ACTIVE" or SRstate == "ACTIVE"):
         if BreakCheck():
             break
         t.sleep(1)
-        print(f"{CRstate}, {MRstate}, {MkRstate}, {SRstate}")
+        print(f"{TRstate}, {TRstate}, {MkRstate}, {SRstate}")
 
     toggleHouseLights(True)
     HouseActive = False
@@ -1179,7 +1179,7 @@ def HLon():
     print("House Lights ON")
     m1Digital_Write(35, 1)
     m1Digital_Write(34, 1)
-    print("CR Lightning ON")
+    print("TR Lightning ON")
     m1Digital_Write(40, 1)
     m1Digital_Write(24, 1)
     m1Digital_Write(28, 1)
@@ -1195,7 +1195,7 @@ def HLoff():
     print("House Lights OFF")
     m1Digital_Write(35, 0)
     m1Digital_Write(34, 0)
-    print("CR Lightning OFF")
+    print("TR Lightning OFF")
     m1Digital_Write(40, 0)
     m1Digital_Write(24, 0)
     m1Digital_Write(28, 0)
@@ -1292,11 +1292,11 @@ def audioMixer(playMixer):  # THIS IS A SEPARATE PROCESS
         MIXERUNO.set_pin_mode_digital_output(i)
 
     playerID = {
-        "MRswampEntrance": 4,
+        "TRswampEntrance": 4,
         "MkRmusic": 5,
         "MkRhit": 6,
         "Unused": 2,
-        "MRhit": 3
+        "TRhit": 3
     }
 
     print("Audio Mixer Initialized.")

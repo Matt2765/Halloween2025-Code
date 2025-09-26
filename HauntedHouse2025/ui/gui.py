@@ -1,6 +1,7 @@
 # ui/gui.py
 import tkinter as tk
 import threading
+from HauntedHouse2025.rooms import cargoHold, gangway, treasureRoom
 from context import house
 from control.shutdown import shutdown
 from control.doors import setDoorState
@@ -13,15 +14,15 @@ def demoEvent(room):
     toggleHouseLights(False)
     log_event(f"[GUI] Starting demo of {room}")
 
-    from rooms import cave, mirror, swamp, mask, graveyard
-    if room == 'CR':
-        threading.Thread(target=cave.run, args=()).start()
-    elif room == 'MR':
-        threading.Thread(target=mirror.run, args=()).start()
+    from rooms import swamp, graveyard
+    if room == 'TR':
+        threading.Thread(target=gangway.run, args=()).start()
+    elif room == 'TR':
+        threading.Thread(target=treasureRoom.run, args=()).start()
     elif room == 'SR':
         threading.Thread(target=swamp.run, args=()).start()
     elif room == 'MkR':
-        threading.Thread(target=mask.run, args=()).start()
+        threading.Thread(target=cargoHold.run, args=()).start()
     elif room == 'GY':
         threading.Thread(target=graveyard.run, args=()).start()
 
@@ -54,11 +55,11 @@ def MainGUI():
     tk.Button(root, text="Open Door 3", height=2, width=15, command=lambda: setDoorState(3, "OPEN")).place(x=25, y=335)
     tk.Button(root, text="Close Door 3", height=2, width=15, command=lambda: setDoorState(3, "CLOSED")).place(x=150, y=335)
 
-    tk.Button(root, text="Demo Cave Room", height=2, width=15, command=lambda: demoEvent('CR')).place(x=150, y=430)
+    tk.Button(root, text="Demo gangway", height=2, width=15, command=lambda: demoEvent('TR')).place(x=150, y=430)
     tk.Button(root, text="Demo Swamp Room", height=2, width=15, command=lambda: demoEvent('SR')).place(x=25, y=430)
     tk.Button(root, text="Demo Graveyard", height=2, width=15, command=lambda: demoEvent('GY')).place(x=275, y=430)
-    tk.Button(root, text="Demo Mirror Room", height=2, width=15, command=lambda: demoEvent("MR")).place(x=25, y=480)
-    tk.Button(root, text="Demo Mask Room", height=2, width=15, command=lambda: demoEvent("MkR")).place(x=150, y=480)
+    tk.Button(root, text="Demo Treasure Room", height=2, width=15, command=lambda: demoEvent("TR")).place(x=25, y=480)
+    tk.Button(root, text="Demo Cargo Hold", height=2, width=15, command=lambda: demoEvent("MkR")).place(x=150, y=480)
 
     tk.Button(root, text="Start Testing", height=2, width=15, command=None).place(x=25, y=570)
     tk.Button(root, text="Toggle House Lights", height=3, width=25, bg="chartreuse2", command=toggleHouseLights).place(x=250, y=125)

@@ -39,13 +39,13 @@ class HalloweenHTTP(BaseHTTPRequestHandler):
             toggleHouseLights()
 
         # Demo endpoints commented out for now
-        # elif message == "/DemoCaveRoom":
-        #     demoEvent("CR")
-        # elif message == "/DemoMirrorRoom":
-        #     demoEvent("MR")
+        # elif message == "/Demogangway":
+        #     demoEvent("TR")
+        # elif message == "/DemotreasureRoom":
+        #     demoEvent("TR")
         # elif message == "/DemoSwampRoom":
         #     demoEvent("SR")
-        # elif message == "/DemoMaskRoom":
+        # elif message == "/DemocargoHold":
         #     demoEvent("MkR")
 
         self.send_response(200)

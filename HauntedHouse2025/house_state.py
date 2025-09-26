@@ -11,8 +11,8 @@ class HouseState:
         self.FRthreadRunning = False
         self.remote_sensor_value = None
 
-        self.CRstate = "INACTIVE"
-        self.MRstate = "INACTIVE"
+        self.TRstate = "INACTIVE"
+        self.TRstate = "INACTIVE"
         self.SRstate = "INACTIVE"
         self.MkRstate = "INACTIVE"
 

@@ -5,7 +5,7 @@ This codebase controls a multi-room haunted house automation system for Hallowee
 
 ## Key Components
 - `HauntedHouse2025/control/`: Core logic for hardware (Arduino, sensors), audio, lighting, and system state.
-- `HauntedHouse2025/rooms/`: Room-specific logic (e.g., `cave.py`, `swamp.py`). Each room imports shared context and audio control.
+- `HauntedHouse2025/rooms/`: Room-specific logic (e.g., `gangway.py`, `swamp.py`). Each room imports shared context and audio control.
 - `HauntedHouse2025/ui/`: User interfaces, including a Tkinter GUI (`gui.py`) and HTTP server (`http_server.py`).
 - `HauntedHouse2025/utils/`: Utility functions for logging, timing, and debugging.
 - `HauntedHouse2025/context.py`: Central state and configuration shared across modules.
@@ -33,7 +33,7 @@ This codebase controls a multi-room haunted house automation system for Hallowee
 - **UI**: Tkinter GUI and HTTP server run in parallel threads.
 
 ## Examples
-- To trigger a sound in a room: `play_to_named_channel('cave', 'spooky.wav')`
+- To trigger a sound in a room: `play_to_named_channel('gangway', 'spooky.wav')`
 - To log an event: `log_event('Door opened')`
 - To toggle demo mode: `toggle_demo_mode(state, enable=True)`
 

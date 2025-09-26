@@ -3,6 +3,7 @@ import time as t
 import threading
 import multiprocessing
 
+from HauntedHouse2025.rooms import cargoHold, gangway, treasureRoom
 from context import house
 from control.audio_manager import play_to_named_channel_async, play_to_all_channels_async
 from control.arduino import connectArduino, m2Digital_Write
@@ -14,7 +15,7 @@ from control import remote_sensor_monitor
 from ui.gui import MainGUI
 from ui.http_server import HTTP_SERVER
 from utils.tools import log_event, BreakCheck
-from rooms import cave, mirror, swamp, mask, graveyard
+from rooms import swamp, graveyard
 from control.doors import spawn_doors
 
 def initialize_system():
@@ -76,17 +77,17 @@ def StartHouse():
         t.sleep(5)
 
         threading.Thread(
-            target=cave.run, 
+            target=gangway.run, 
             args=(), 
             daemon=True, 
-            name="caveRoom"
+            name="gangway"
         ).start()
         
         threading.Thread(
-            target=mirror.run, 
+            target=treasureRoom.run, 
             args=(), 
             daemon=True, 
-            name="mirrorRoom"
+            name="treasureRoom"
         ).start()
         
         threading.Thread(
@@ -97,10 +98,10 @@ def StartHouse():
         ).start()
         
         threading.Thread(
-            target=mask.run, 
+            target=cargoHold.run, 
             args=(), 
             daemon=True, 
-            name="maskRoom"
+            name="cargoHold"
         ).start()
 
         while house.HouseActive:
