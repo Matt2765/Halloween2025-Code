@@ -5,6 +5,7 @@ from control.audio_manager import play_to_named_channel_async
 from control.arduino import m1Digital_Write, m2Read_Analog
 from control.doors import setDoorState
 from utils.tools import BreakCheck, log_event
+from control.remote_sensor_monitor import get_value
 
 
 def run():
@@ -14,7 +15,7 @@ def run():
     try:
         while house.HouseActive or house.Demo:
             # Sensor or demo trigger
-            if m2Read_Analog(7) > 200 or house.Demo:
+            if get_value("TOF1", "dist_mm") > 400 or house.Demo:
                 setDoorState(1, "CLOPEN")
                 #play_to_named_channel_async("cannon1.wav", "frontLeft")
                 m1Digital_Write(27, 1)  # Start animatronic

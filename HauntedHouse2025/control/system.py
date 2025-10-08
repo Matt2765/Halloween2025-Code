@@ -2,6 +2,7 @@
 import time as t
 import threading
 import multiprocessing
+import remote_sensor_monitor
 
 from HauntedHouse2025.rooms import cargoHold, gangway, treasureRoom
 from context import house
@@ -31,6 +32,8 @@ def initialize_system():
             # Launch core services
             threading.Thread(target=HTTP_SERVER, daemon=True).start()
             threading.Thread(target=MainGUI, daemon=True).start()
+            
+            remote_sensor_monitor.init(port=None, baud=921600)
             
             house.Boot = False
             
