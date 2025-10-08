@@ -70,8 +70,8 @@ def door_process(id):
         return True
 
     def door_sensor_check():
-        distance = house.remote_sensor_value(DOOR_SENSOR_IDS[id])
-        return distance is not None and distance < 150  # customize threshold
+        #replace with remote sensor check
+        return 
 
     def handle_change(last_state):
         if house.DoorState[id] == "OPEN":

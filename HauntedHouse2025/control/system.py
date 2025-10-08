@@ -2,9 +2,8 @@
 import time as t
 import threading
 import multiprocessing
-import remote_sensor_monitor
 
-from HauntedHouse2025.rooms import cargoHold, gangway, treasureRoom
+from rooms import cargoHold, gangway, treasureRoom
 from context import house
 from control.audio_manager import play_to_named_channel_async, play_to_all_channels_async
 from control.arduino import connectArduino, m2Digital_Write
@@ -40,7 +39,6 @@ def initialize_system():
         log_event("[System] Initializing non-persistent services...")
 
         # threading.Thread(target=analog_update_loop, daemon=True).start() # Commented out because hoping to use only remote sensors
-        _, house.remote_sensor_value = remote_sensor_monitor.start_sensor_listener()
                 
         spawn_doors()
 

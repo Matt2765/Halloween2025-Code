@@ -8,7 +8,7 @@
 #include "esp_idf_version.h"
 
 #define ESPNOW_WIFI_CHANNEL 1
-#define SERIAL_BAUD 115200
+#define SERIAL_BAUD 921600
 #define MAX_LINE_LEN 240
 #define QUEUE_DEPTH 128
 #define ACK_MAGIC 0xA1C3

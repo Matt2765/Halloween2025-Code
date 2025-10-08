@@ -8,8 +8,6 @@ def run():
     log_event("[SwampRoom] Starting...")
     house.SRstate = "ACTIVE"
 
-    log_event(f'[SwampRoom] REMOTE_TEST: {house.remote_sensor_value("TOF1")}')
-
     while house.HouseActive or house.Demo:
         log_event("[SwampRoom] Running loop...")
         #play_to_named_channel_async("cannon1.wav", "swampRoom")

@@ -1,7 +1,7 @@
 # ui/gui.py
 import tkinter as tk
 import threading
-from HauntedHouse2025.rooms import cargoHold, gangway, treasureRoom
+from rooms import cargoHold, gangway, treasureRoom
 from context import house
 from control.shutdown import shutdown
 from control.doors import setDoorState
