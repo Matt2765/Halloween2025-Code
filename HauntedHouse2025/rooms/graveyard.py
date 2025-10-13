@@ -14,6 +14,7 @@ def run():
     while house.HouseActive or house.Demo:
         log_event("[Graveyard] Running loop...")
         MedallionCallsEvent()
+        BeckettsDeathEvent()
         
         for i in range(30):
             t.sleep(1)
@@ -25,6 +26,37 @@ def run():
             break
 
     log_event("[Graveyard] Exiting.")
+    
+def BeckettsDeathEvent():
+    global Scripted_Event 
+    Scripted_Event = True
+    
+    log_event("[Graveyard] Beckett's Death Event Starting...")
+    play_to_named_channel_async("GraveyardScene2v2.wav", "graveyard", gain_override=.6)
+    
+    for i in range(58):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    play_to_named_channel_async("CannonDesigned_2.wav", "graveyard", gain_override=1.2)
+    
+    for i in range(5):
+        t.sleep(1)
+        if BreakCheck():
+            return
+    
+    threading.Thread(target=randCannons, daemon=True).start()
+    
+    for i in range(288):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    log_event("[Graveyard] Beckett's Death Event Ending...")
+        
+    Scripted_Event = False
+    
     
 def MedallionCallsEvent():
     global Scripted_Event 
@@ -131,6 +163,8 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
         
+    log_event("[Graveyard] Medallion Calls Event Ending...")
+        
     Scripted_Event = False
 
 def randAttackerCannons():
@@ -141,3 +175,13 @@ def randAttackerCannons():
         audio = random.choice(audioFiles)
         play_to_named_channel_async(f"{audio}", "graveyard", gain_override=.2)
         t.sleep(random.uniform(.2, 5))
+        
+def randCannons():
+    audioFiles = ["CannonDesigned_1.wav", 
+                  "CannonDesigned_2.wav",
+                  "CannonDesigned_3.wav", 
+                  "CannonDesigned_4.wav"]
+    while Scripted_Event and house.HouseActive:
+        audio = random.choice(audioFiles)
+        play_to_named_channel_async(f"{audio}", "graveyard", gain_override=1.2)
+        t.sleep(random.uniform(10, 20))

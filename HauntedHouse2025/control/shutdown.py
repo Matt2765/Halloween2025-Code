@@ -84,7 +84,7 @@ def shutdownDetector():
     if house.systemState == "EmergencyShutoff":
         log_event("EMERGENCY SHUTDOWN DETECTED - Please type keyword 'SAFE' into terminal to return to standby mode.")
         stop_all_audio()
-        t.sleep(.1)
+        #t.sleep(.1)
         play_to_all_channels_async("emergency shutdown activated")
         shutdown()
         for _ in range(3):
@@ -126,7 +126,7 @@ def shutdownDetector():
     else:
         log_event("Shutdown ID unknown - Please type keyword 'SAFE' into terminal to return to standby mode.")
         stop_all_audio()
-        t.sleep(.2)
+        #t.sleep(.2)
         play_to_all_channels_async("unknown shutdown detected")
         shutdown()
         while True:
