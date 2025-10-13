@@ -108,7 +108,7 @@ def shutdownDetector():
     elif house.systemState == "SoftShutdown":
         log_event("SOFT SHUTDOWN DETECTED - Systems will be restarted to standby.")
         stop_all_audio()
-        t.sleep(.2)
+        #t.sleep(1)
         play_to_all_channels_async("soft shutdown activated")
         shutdown()
         for _ in range(3):
