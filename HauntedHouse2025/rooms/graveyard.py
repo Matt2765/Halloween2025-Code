@@ -41,7 +41,7 @@ def MedallionCallsEvent():
             
     threading.Thread(target=randAttackerCannons, daemon=True).start()
         
-    for i in range(5): #22
+    for i in range(3): #22
         t.sleep(1)
         if BreakCheck():
             return
@@ -50,7 +50,7 @@ def MedallionCallsEvent():
     t.sleep(.8)
     play_to_named_channel_async("impactDebris01.wav", "graveyard", gain_override=1)
         
-    for i in range(6): #28.8
+    for i in range(8): #28.8
         t.sleep(1)
         if BreakCheck():
             return
