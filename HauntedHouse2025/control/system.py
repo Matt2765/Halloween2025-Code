@@ -60,7 +60,7 @@ def initialize_system():
 
 def StartHouse():
     if not house.HouseActive and house.systemState == "ONLINE":
-        play_to_all_channels_async("starting house")
+        play_to_all_channels_async("starting house", gain_override=0.1)
         log_event("[System] Launching main sequence...")
         house.HouseActive = True
 

@@ -1,22 +1,15 @@
 # control/audio_manager.py
 # -------------------------------------------------------------------
 # Generation-based audio stop system (epoch cutoff)
+# + HDMI-friendly sample-rate handling and low-RAM channel mapping
 # -------------------------------------------------------------------
-# What’s new:
-# - Every playback is tagged with a monotonically increasing epoch ID.
-# - Calling stop_all_audio() snapshots the current epoch into _cutoff_epoch
-#   and signals a wake event. Any playback whose epoch <= _cutoff_epoch exits
-#   at the next buffer boundary (near-instant on small blocks).
-# - New audio (e.g., TTS generated WAV) started AFTER stop_all_audio()
-#   gets a higher epoch, so it keeps playing normally.
-#
-# Notes:
-# - We only use sounddevice + soundfile.
-# - We do NOT “sleep and poll”; we check the cutoff on each block write and
-#   also wake blocked writers via _stop_event so they re-check immediately.
-# - We keep a tiny per-playback _Session(done Event, epoch) so stop can wait
-#   briefly for all pre-cutoff sessions to terminate (deterministic).
-# - Blocksize ~= 20 ms for responsive stops without excessive CPU use.
+# What’s new in this version:
+# 1) Auto-resample every clip to the selected device’s default rate
+#    (typically 48000 Hz for HDMI receivers) -> fixes PaError -9997.
+# 2) Per-block channel mapping instead of prebuilding a giant
+#    (samples, channels) array -> avoids huge RAM spikes.
+# 3) Device chooser now returns (idx, max_out, default_samplerate),
+#    and streams are always opened at that samplerate.
 # -------------------------------------------------------------------
 
 from __future__ import annotations
@@ -41,16 +34,16 @@ from utils.tools import log_event
 named_channels: Dict[str, Dict[str, float | int]] = {
     "frontLeft":     {"index": 0, "gain": 1.0},
     "frontRight":    {"index": 1, "gain": 1.0},
-    "center":        {"index": 2, "gain": 1.4},
+    "graveyard":     {"index": 2, "gain": 1.4},
     "subwoofer":     {"index": 3, "gain": 1.4},
     "swampRoom":     {"index": 4, "gain": 1.6},
     "atticSpeaker":  {"index": 5, "gain": 1.6},
-    "graveyard":     {"index": 6, "gain": 1.8},
+    "graveyard1":    {"index": 6, "gain": 1.8},
     "closetCreak":   {"index": 7, "gain": 1.8},
 }
 
 DEFAULT_SOUND_DIR = (Path(__file__).resolve().parents[3] / "Assets" / "SoundDir").resolve()
-DEFAULT_DEVICE_INDEX: Optional[int] = 50  # 38 IS THE 7.1 CARD INDEX
+DEFAULT_DEVICE_INDEX: Optional[int] = 11  # your RX-V673 device index
 DEFAULT_TOTAL_CHANNELS = 8
 
 
@@ -156,14 +149,76 @@ def _read_audio_mono(file_path: Path) -> tuple[np.ndarray, int]:
         mono = data.mean(axis=1)
     return mono.astype("float32", copy=False), int(fs)
 
-def _play_array_nonblocking(arr: np.ndarray, fs: int, device_index: Optional[int], label: str) -> None:
+def _choose_output_device(preferred_index: int | None) -> Tuple[int | None, int, int]:
     """
-    Play array on a background thread with its own OutputStream.
-    Uses epoch cutoff for deterministic global stops.
+    Returns (device_index, max_output_channels, default_samplerate_int).
+    """
+    devices = sd.query_devices()
 
-    - This playback's epoch is captured at start.
-    - On each block, if epoch <= _cutoff_epoch OR _stop_event.is_set(), the worker exits.
-    - Blocksize ~ 20 ms for responsive stopping.
+    def valid_out(idx: int) -> bool:
+        return 0 <= idx < len(devices) and devices[idx].get("max_output_channels", 0) > 0
+
+    def _pack(idx: int) -> Tuple[int, int, int]:
+        max_out = int(devices[idx]["max_output_channels"])
+        # Some drivers report float; round to int
+        default_fs = int(round(float(devices[idx].get("default_samplerate", 48000.0))))
+        log_event(f"[Audio] Using device {_device_label(idx)} with {max_out} output channels @ {default_fs} Hz default")
+        return idx, max_out, default_fs
+
+    if isinstance(preferred_index, int) and valid_out(preferred_index):
+        return _pack(preferred_index)
+
+    # System default
+    try:
+        default_in, default_out = sd.default.device
+    except Exception:
+        default_out = None
+
+    if isinstance(default_out, int) and valid_out(default_out):
+        return _pack(default_out)
+
+    # First available
+    for idx, d in enumerate(devices):
+        if d.get("max_output_channels", 0) > 0:
+            return _pack(idx)
+
+    raise RuntimeError("No output audio devices with output channels found.")
+
+def _ensure_samplerate(x: np.ndarray, src_fs: int, dst_fs: int) -> tuple[np.ndarray, int]:
+    """
+    Convert 'x' (mono float32) from src_fs to dst_fs if needed.
+    High-quality, dependency-free vector interpolation.
+    Returns (y, dst_fs).
+    """
+    if src_fs == dst_fs:
+        return x, src_fs
+    # Vectorized linear interpolation (fast, sufficient for SFX/TTS)
+    n_src = x.shape[0]
+    n_dst = int(round(n_src * (dst_fs / src_fs)))
+    t_src = np.linspace(0.0, 1.0, num=n_src, endpoint=False, dtype=np.float64)
+    t_dst = np.linspace(0.0, 1.0, num=n_dst, endpoint=False, dtype=np.float64)
+    y = np.interp(t_dst, t_src, x.astype(np.float64, copy=False)).astype(np.float32, copy=False)
+    return y, dst_fs
+
+
+# ---------- Core playback (epoch cutoff, per-block mapping) ----------
+
+def _play_mono_nonblocking(
+    mono: np.ndarray,
+    fs: int,
+    device_index: Optional[int],
+    have_channels: int,
+    mode: str,
+    ch_index: int | None,
+    gain: float,
+    label: str,
+) -> None:
+    """
+    Play a mono buffer with per-block channel mapping:
+      - mode == "all"  -> repeat mono to all available output channels
+      - mode == "one"  -> route mono only to 'ch_index'
+      - have_channels  -> number of output channels the device exposes
+    Uses epoch cutoff for deterministic global stops.
     """
     epoch = _next_epoch()
     session = _Session(epoch=epoch, label=label)
@@ -171,25 +226,44 @@ def _play_array_nonblocking(arr: np.ndarray, fs: int, device_index: Optional[int
     def _worker():
         stream = None
         try:
-            # Use a short blocksize for responsive stop behavior (~20 ms)
+            # ~20 ms block for responsive stop behavior
             blocksize = max(256, fs // 50)
 
             with sd.OutputStream(
                 samplerate=fs,
                 device=device_index,
-                channels=arr.shape[1],
+                channels=max(1, have_channels),
                 dtype="float32"
             ) as stream:
                 with _active_lock:
                     _active_streams.append(stream)
                     _active_sessions.append(session)
 
-                # Iterate in blocks; bail immediately if this is a pre-cutoff playback
-                for start in range(0, len(arr), blocksize):
+                n = mono.shape[0]
+                pos = 0
+                while pos < n:
                     if epoch <= _cutoff_epoch or _stop_event.is_set():
                         break
-                    end = start + blocksize
-                    stream.write(arr[start:end])
+
+                    end = min(pos + blocksize, n)
+                    block = mono[pos:end] * gain  # shape (b,)
+
+                    if have_channels <= 1:
+                        out = block[:, None]
+                    elif have_channels == 2:
+                        # Simple stereo duplicate
+                        out = np.column_stack((block, block))
+                    else:
+                        if mode == "all":
+                            out = np.repeat(block[:, None], have_channels, axis=1)
+                        else:
+                            use_idx = min(int(ch_index or 0), have_channels - 1)
+                            out = np.zeros((block.shape[0], have_channels), dtype=np.float32)
+                            out[:, use_idx] = block
+
+                    stream.write(out)
+                    pos = end
+
         finally:
             with _active_lock:
                 if stream and stream in _active_streams:
@@ -201,35 +275,6 @@ def _play_array_nonblocking(arr: np.ndarray, fs: int, device_index: Optional[int
     t = threading.Thread(target=_worker, daemon=True, name=f"AudioWorker@{epoch}")
     t.start()
 
-def _choose_output_device(preferred_index: int | None) -> Tuple[int | None, int]:
-    devices = sd.query_devices()
-
-    def valid_out(idx: int) -> bool:
-        return 0 <= idx < len(devices) and devices[idx].get("max_output_channels", 0) > 0
-
-    if isinstance(preferred_index, int) and valid_out(preferred_index):
-        max_out = int(devices[preferred_index]["max_output_channels"])
-        log_event(f"[Audio] Using preferred device {_device_label(preferred_index)} with {max_out} output channels")
-        return preferred_index, max_out
-
-    try:
-        default_in, default_out = sd.default.device
-    except Exception:
-        default_out = None
-
-    if isinstance(default_out, int) and valid_out(default_out):
-        max_out = int(devices[default_out]["max_output_channels"])
-        log_event(f"[Audio] Using system default device {_device_label(default_out)} with {max_out} output channels")
-        return default_out, max_out
-
-    for idx, d in enumerate(devices):
-        if d.get("max_output_channels", 0) > 0:
-            max_out = int(d["max_output_channels"])
-            log_event(f"[Audio] Using first available device {_device_label(idx)} with {max_out} output channels")
-            return idx, max_out
-
-    raise RuntimeError("No output audio devices with output channels found.")
-
 
 # ---------- Shutdown control (epoch cutoff) ----------
 
@@ -237,11 +282,6 @@ def stop_all_audio(timeout: float = 2.0):
     """
     Cut off ALL audio that started at or before the current epoch.
     New audio started AFTER this call (e.g., immediate TTS) will continue.
-
-    Steps:
-      1) Snapshot the current play epoch into _cutoff_epoch.
-      2) Signal _stop_event so any sleepers wake and re-check cutoff.
-      3) Wait briefly for all pre-cutoff sessions to report done.
     """
     global _cutoff_epoch
     with _epoch_lock:
@@ -251,8 +291,7 @@ def stop_all_audio(timeout: float = 2.0):
     _stop_event.set()
     log_event(f"[Audio] stop_all_audio(): cutoff_epoch set to {snapshot}")
 
-    # Wait for all sessions with epoch <= cutoff to finish (drain up to 'timeout')
-    end_time = sd.get_stream_write_available.__self__ if False else None  # (doc hint: ignore)
+    # Wait briefly for all pre-cutoff sessions to finish
     deadline = None
     if timeout is not None and timeout > 0:
         import time as _t
@@ -272,10 +311,8 @@ def stop_all_audio(timeout: float = 2.0):
             if s.done.wait(timeout=0.05):
                 break
 
-    # Clear the event so subsequent, post-cutoff playbacks don't get a spurious wake
     _stop_event.clear()
 
-    # Final status log
     with _active_lock:
         still_alive = [s for s in _active_sessions if s.epoch <= snapshot and not s.done.is_set()]
         total_post = [s for s in _active_sessions if s.epoch > snapshot]
@@ -290,7 +327,7 @@ def play_to_named_channel(
     wav_file: str,
     target_name: str,
     device_index: int | None = DEFAULT_DEVICE_INDEX,
-    total_channels: int = DEFAULT_TOTAL_CHANNELS,
+    total_channels: int = DEFAULT_TOTAL_CHANNELS,  # kept for API compatibility; not used directly
     gain_override: float | None = None,
     base_folder: Path | str | None = None,
 ) -> None:
@@ -302,39 +339,41 @@ def play_to_named_channel(
     if not file_path.exists():
         raise FileNotFoundError(f"Audio file not found: {file_path}")
 
-    target = named_channels[target_name]
-    ch_index = int(target["index"])
+    # Choose device and get its default samplerate
+    dev_idx, have_channels, dev_fs = _choose_output_device(device_index)
 
     # Gain logic
+    target = named_channels[target_name]
+    ch_index = int(target["index"])
     if gain_override is not None:
         gain = float(gain_override)
     else:
         gain = float(target["gain"])
-        if device_index is not None:
-            dev_idx_probe, _ = _choose_output_device(device_index)
-            if dev_idx_probe != device_index:
-                log_event("[Audio] Fallback device in use — resetting gain to 1.0 for safety")
-                gain = 1.0
+        if device_index is not None and dev_idx != device_index:
+            log_event("[Audio] Fallback device in use — resetting gain to 1.0 for safety")
+            gain = 1.0
 
-    mono, fs = _read_audio_mono(file_path)
-    dev_idx, have_channels = _choose_output_device(device_index)
+    mono, src_fs = _read_audio_mono(file_path)
+    mono, out_fs = _ensure_samplerate(mono, src_fs, dev_fs)
 
-    if have_channels <= 1:
-        out = mono[:, None] * gain
-        use_idx = 0
-    elif have_channels == 2:
-        out = np.concatenate([mono[:, None], mono[:, None]], axis=1) * gain
-        use_idx = 0
-    else:
-        use_idx = min(ch_index, have_channels - 1)
-        out = np.zeros((mono.shape[0], have_channels), dtype="float32")
-        out[:, use_idx] = mono * gain
+    use_idx = 0 if have_channels <= 1 else min(ch_index, have_channels - 1)
 
     log_event(
         f"[Audio] Playing '{file_path.name}' -> channel '{target_name}' (idx {use_idx}), "
-        f"gain={gain:.2f}, device={_device_label(dev_idx)}, channels={have_channels}, fs={fs}"
+        f"gain={gain:.2f}, device={_device_label(dev_idx)}, "
+        f"channels={have_channels}, fs_in={src_fs} -> fs_out={out_fs}"
     )
-    _play_array_nonblocking(out, fs=fs, device_index=dev_idx, label=f"{file_path.name}@{target_name}")
+
+    _play_mono_nonblocking(
+        mono=mono,
+        fs=out_fs,
+        device_index=dev_idx,
+        have_channels=have_channels,
+        mode="one",
+        ch_index=use_idx,
+        gain=gain,
+        label=f"{file_path.name}@{target_name}"
+    )
 
 def play_to_all_channels(
     wav_or_text: str,
@@ -369,8 +408,7 @@ def play_to_all_channels(
         if not Path(file_path).exists():
             raise FileNotFoundError(f"Audio file not found: {file_path}")
 
-        mono, fs = _read_audio_mono(Path(file_path))
-        dev_idx, have_channels = _choose_output_device(device_index)
+        dev_idx, have_channels, dev_fs = _choose_output_device(device_index)
 
         # Gain logic
         if gain_override is not None:
@@ -380,17 +418,25 @@ def play_to_all_channels(
             if device_index is not None and dev_idx != device_index:
                 log_event("[Audio] Fallback device in use — resetting gain to 1.0 for safety")
 
-        if have_channels <= 1:
-            out = mono[:, None] * gain
-        else:
-            out = np.repeat(mono[:, None], have_channels, axis=1) * gain
+        mono, src_fs = _read_audio_mono(Path(file_path))
+        mono, out_fs = _ensure_samplerate(mono, src_fs, dev_fs)
 
         label = f"file:{Path(file_path).name}" if treat_as_file else f"tts:{str(wav_or_text)[:40]}"
         log_event(
             f"[Audio] Playing {label} -> ALL channels ({have_channels}), "
-            f"gain={gain:.2f}, device={_device_label(dev_idx)}, fs={fs}"
+            f"gain={gain:.2f}, device={_device_label(dev_idx)}, fs_in={src_fs} -> fs_out={out_fs}"
         )
-        _play_array_nonblocking(out, fs=fs, device_index=dev_idx, label=label)
+
+        _play_mono_nonblocking(
+            mono=mono,
+            fs=out_fs,
+            device_index=dev_idx,
+            have_channels=have_channels,
+            mode="all",
+            ch_index=None,
+            gain=gain,
+            label=label
+        )
 
     finally:
         if tmp_path and tmp_path.exists():
