@@ -84,8 +84,8 @@ def shutdownDetector():
     if house.systemState == "EmergencyShutoff":
         log_event("EMERGENCY SHUTDOWN DETECTED - Please type keyword 'SAFE' into terminal to return to standby mode.")
         stop_all_audio()
-        t.sleep(.1)
-        play_to_all_channels_async("emergency shutdown activated", gain_override=0.1)
+        #t.sleep(.1)
+        play_to_all_channels_async("emergency shutdown activated")
         shutdown()
         for _ in range(3):
             toggleHouseLights(True)
@@ -95,12 +95,12 @@ def shutdownDetector():
         while True:
             input1 = input().upper()
             if input1 == "SAFE":
-                play_to_all_channels_async(f"returning to standby in 5 seconds", gain_override=0.1)
+                play_to_all_channels_async(f"returning to standby in 5 seconds")
                 for a in range(5, 0, -1):
                     log_event(f"Returning to standby in {a} seconds.")
                     t.sleep(1)
                 house.systemState = "REBOOT"
-                play_to_all_channels_async("system rebooting", gain_override=0.1)
+                play_to_all_channels_async("system rebooting")
                 break
             else:
                 log_event("Invalid command. Please type keyword 'SAFE' into terminal to return to standby mode.")
@@ -109,25 +109,25 @@ def shutdownDetector():
         log_event("SOFT SHUTDOWN DETECTED - Systems will be restarted to standby.")
         stop_all_audio()
         #t.sleep(1)
-        play_to_all_channels_async("soft shutdown activated", gain_override=0.1)
+        play_to_all_channels_async("soft shutdown activated")
         shutdown()
         for _ in range(3):
             toggleHouseLights(True)
             t.sleep(0.25)
             toggleHouseLights(False)
             t.sleep(0.25)
-        play_to_all_channels_async(f"returning to standby in 5 seconds", gain_override=0.1)
+        play_to_all_channels_async(f"returning to standby in 5 seconds")
         for a in range(5, 0, -1):
             log_event(f"Returning to standby in {a} seconds.")
             t.sleep(1)
         house.systemState = "REBOOT"
-        play_to_all_channels_async("system rebooting", gain_override=0.1)
+        play_to_all_channels_async("system rebooting")
 
     else:
         log_event("Shutdown ID unknown - Please type keyword 'SAFE' into terminal to return to standby mode.")
         stop_all_audio()
-        t.sleep(.2)
-        play_to_all_channels_async("unknown shutdown detected", gain_override=0.1)
+        #t.sleep(.2)
+        play_to_all_channels_async("unknown shutdown detected")
         shutdown()
         while True:
             input1 = input().upper()
