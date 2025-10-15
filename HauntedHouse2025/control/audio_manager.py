@@ -2,14 +2,7 @@
 # -------------------------------------------------------------------
 # Generation-based audio stop system (epoch cutoff)
 # + HDMI-friendly sample-rate handling and low-RAM channel mapping
-# -------------------------------------------------------------------
-# What’s new in this version:
-# 1) Auto-resample every clip to the selected device’s default rate
-#    (typically 48000 Hz for HDMI receivers) -> fixes PaError -9997.
-# 2) Per-block channel mapping instead of prebuilding a giant
-#    (samples, channels) array -> avoids huge RAM spikes.
-# 3) Device chooser now returns (idx, max_out, default_samplerate),
-#    and streams are always opened at that samplerate.
+# + WASAPI Exclusive + latency tuning + prebuffering (stutter fix)
 # -------------------------------------------------------------------
 
 from __future__ import annotations
@@ -33,8 +26,8 @@ from utils.tools import log_event
 
 named_channels: Dict[str, Dict[str, float | int]] = {
     "frontLeft":     {"index": 0, "gain": 1.0},
-    "frontRight":    {"index": 1, "gain": 1.0},
-    "graveyard":     {"index": 2, "gain": 1.4},
+    "graveyard":     {"index": 1, "gain": 1.0},
+    "center":        {"index": 2, "gain": 1.4},
     "subwoofer":     {"index": 3, "gain": 1.4},
     "swampRoom":     {"index": 4, "gain": 1.6},
     "atticSpeaker":  {"index": 5, "gain": 1.6},
@@ -49,27 +42,20 @@ DEFAULT_TOTAL_CHANNELS = 8
 
 # ---------- Globals (epochs, sessions, state) ----------
 
-# Epoch counter for playbacks; increment for every new playback
 _play_epoch: int = 0
 _epoch_lock = threading.Lock()
 
-# Any playback with epoch <= _cutoff_epoch must stop
 _cutoff_epoch: int = 0
-
-# Wake signal so any blocked writer re-checks cutoff immediately
 _stop_event = threading.Event()
 
-# Track active audio sessions so we can deterministically wait in stop_all_audio
 class _Session:
     def __init__(self, epoch: int, label: str):
         self.epoch = epoch
         self.done = threading.Event()
-        self.label = label  # for logging/debug only
+        self.label = label
 
 _active_lock = threading.Lock()
 _active_sessions: list[_Session] = []
-
-# (Optional) Keep list of live streams for visibility (not strictly required)
 _active_streams: list[sd.OutputStream] = []
 
 
@@ -78,13 +64,13 @@ _active_streams: list[sd.OutputStream] = []
 def text_to_wav(text: str, path: Path, rate: int = 0):
     system = platform.system()
 
-    if system in ("Linux", "Darwin"):  # macOS = Darwin
+    if system in ("Linux", "Darwin"):
         subprocess.run(
             ["espeak", f"-s{150 + rate*10}", "-w", str(path), text],
             check=True
         )
     elif system == "Windows":
-        rate = max(-10, min(10, rate))  # clamp to -10..10
+        rate = max(-10, min(10, rate))
         ps_script = f'''
         Add-Type -AssemblyName System.Speech
         $speak = New-Object System.Speech.Synthesis.SpeechSynthesizer
@@ -143,10 +129,7 @@ def _device_label(idx: int) -> str:
 
 def _read_audio_mono(file_path: Path) -> tuple[np.ndarray, int]:
     data, fs = sf.read(str(file_path), dtype="float32", always_2d=True)
-    if data.shape[1] == 1:
-        mono = data[:, 0]
-    else:
-        mono = data.mean(axis=1)
+    mono = data[:, 0] if data.shape[1] == 1 else data.mean(axis=1)
     return mono.astype("float32", copy=False), int(fs)
 
 def _choose_output_device(preferred_index: int | None) -> Tuple[int | None, int, int]:
@@ -160,7 +143,6 @@ def _choose_output_device(preferred_index: int | None) -> Tuple[int | None, int,
 
     def _pack(idx: int) -> Tuple[int, int, int]:
         max_out = int(devices[idx]["max_output_channels"])
-        # Some drivers report float; round to int
         default_fs = int(round(float(devices[idx].get("default_samplerate", 48000.0))))
         log_event(f"[Audio] Using device {_device_label(idx)} with {max_out} output channels @ {default_fs} Hz default")
         return idx, max_out, default_fs
@@ -168,7 +150,6 @@ def _choose_output_device(preferred_index: int | None) -> Tuple[int | None, int,
     if isinstance(preferred_index, int) and valid_out(preferred_index):
         return _pack(preferred_index)
 
-    # System default
     try:
         default_in, default_out = sd.default.device
     except Exception:
@@ -177,7 +158,6 @@ def _choose_output_device(preferred_index: int | None) -> Tuple[int | None, int,
     if isinstance(default_out, int) and valid_out(default_out):
         return _pack(default_out)
 
-    # First available
     for idx, d in enumerate(devices):
         if d.get("max_output_channels", 0) > 0:
             return _pack(idx)
@@ -186,13 +166,10 @@ def _choose_output_device(preferred_index: int | None) -> Tuple[int | None, int,
 
 def _ensure_samplerate(x: np.ndarray, src_fs: int, dst_fs: int) -> tuple[np.ndarray, int]:
     """
-    Convert 'x' (mono float32) from src_fs to dst_fs if needed.
-    High-quality, dependency-free vector interpolation.
-    Returns (y, dst_fs).
+    Convert 'x' (mono float32) from src_fs to dst_fs if needed via vectorized interpolation.
     """
     if src_fs == dst_fs:
         return x, src_fs
-    # Vectorized linear interpolation (fast, sufficient for SFX/TTS)
     n_src = x.shape[0]
     n_dst = int(round(n_src * (dst_fs / src_fs)))
     t_src = np.linspace(0.0, 1.0, num=n_src, endpoint=False, dtype=np.float64)
@@ -201,7 +178,7 @@ def _ensure_samplerate(x: np.ndarray, src_fs: int, dst_fs: int) -> tuple[np.ndar
     return y, dst_fs
 
 
-# ---------- Core playback (epoch cutoff, per-block mapping) ----------
+# ---------- Core playback (epoch cutoff, per-block mapping, WASAPI exclusive) ----------
 
 def _play_mono_nonblocking(
     mono: np.ndarray,
@@ -214,11 +191,8 @@ def _play_mono_nonblocking(
     label: str,
 ) -> None:
     """
-    Play a mono buffer with per-block channel mapping:
-      - mode == "all"  -> repeat mono to all available output channels
-      - mode == "one"  -> route mono only to 'ch_index'
-      - have_channels  -> number of output channels the device exposes
-    Uses epoch cutoff for deterministic global stops.
+    mode == "all": duplicate mono to all channels
+    mode == "one": route mono only to ch_index (others zero)
     """
     epoch = _next_epoch()
     session = _Session(epoch=epoch, label=label)
@@ -226,32 +200,44 @@ def _play_mono_nonblocking(
     def _worker():
         stream = None
         try:
-            # ~20 ms block for responsive stop behavior
-            blocksize = max(256, fs // 50)
+            # Slightly larger block + latency to avoid underruns on HDMI
+            blocksize = max(512, fs // 25)  # ~40 ms @ 48k
+            extra = None
+            try:
+                if platform.system() == "Windows":
+                    extra = sd.WasapiSettings(exclusive=True)
+            except Exception:
+                extra = None
 
             with sd.OutputStream(
                 samplerate=fs,
                 device=device_index,
                 channels=max(1, have_channels),
-                dtype="float32"
+                dtype="float32",
+                blocksize=blocksize,
+                latency=0.06,             # ~60 ms device latency
+                extra_settings=extra,      # WASAPI Exclusive on Windows
             ) as stream:
                 with _active_lock:
                     _active_streams.append(stream)
                     _active_sessions.append(session)
+
+                # Prebuffer zeros to fill device FIFO and avoid first-block hiccup
+                zero_blk = np.zeros((blocksize, max(1, have_channels)), dtype=np.float32)
+                stream.write(zero_blk)
+                stream.write(zero_blk)
 
                 n = mono.shape[0]
                 pos = 0
                 while pos < n:
                     if epoch <= _cutoff_epoch or _stop_event.is_set():
                         break
-
                     end = min(pos + blocksize, n)
-                    block = mono[pos:end] * gain  # shape (b,)
+                    block = mono[pos:end] * gain  # (b,)
 
                     if have_channels <= 1:
                         out = block[:, None]
                     elif have_channels == 2:
-                        # Simple stereo duplicate
                         out = np.column_stack((block, block))
                     else:
                         if mode == "all":
@@ -272,28 +258,22 @@ def _play_mono_nonblocking(
                     _active_sessions.remove(session)
             session.done.set()
 
-    t = threading.Thread(target=_worker, daemon=True, name=f"AudioWorker@{epoch}")
-    t.start()
+    threading.Thread(target=_worker, daemon=True, name=f"AudioWorker@{epoch}").start()
 
 
 # ---------- Shutdown control (epoch cutoff) ----------
 
 def stop_all_audio(timeout: float = 2.0):
-    """
-    Cut off ALL audio that started at or before the current epoch.
-    New audio started AFTER this call (e.g., immediate TTS) will continue.
-    """
-    global _cutoff_epoch
     with _epoch_lock:
         snapshot = _play_epoch
+        global _cutoff_epoch
         _cutoff_epoch = snapshot
 
     _stop_event.set()
     log_event(f"[Audio] stop_all_audio(): cutoff_epoch set to {snapshot}")
 
-    # Wait briefly for all pre-cutoff sessions to finish
     deadline = None
-    if timeout is not None and timeout > 0:
+    if timeout and timeout > 0:
         import time as _t
         deadline = _t.time() + timeout
 
@@ -306,7 +286,6 @@ def stop_all_audio(timeout: float = 2.0):
             import time as _t
             if _t.time() >= deadline:
                 break
-        # Wait a short slice or until one completes
         for s in pending:
             if s.done.wait(timeout=0.05):
                 break
@@ -327,7 +306,7 @@ def play_to_named_channel(
     wav_file: str,
     target_name: str,
     device_index: int | None = DEFAULT_DEVICE_INDEX,
-    total_channels: int = DEFAULT_TOTAL_CHANNELS,  # kept for API compatibility; not used directly
+    total_channels: int = DEFAULT_TOTAL_CHANNELS,  # kept for API compatibility
     gain_override: float | None = None,
     base_folder: Path | str | None = None,
 ) -> None:
@@ -339,10 +318,8 @@ def play_to_named_channel(
     if not file_path.exists():
         raise FileNotFoundError(f"Audio file not found: {file_path}")
 
-    # Choose device and get its default samplerate
     dev_idx, have_channels, dev_fs = _choose_output_device(device_index)
 
-    # Gain logic
     target = named_channels[target_name]
     ch_index = int(target["index"])
     if gain_override is not None:
@@ -410,7 +387,6 @@ def play_to_all_channels(
 
         dev_idx, have_channels, dev_fs = _choose_output_device(device_index)
 
-        # Gain logic
         if gain_override is not None:
             gain = float(gain_override)
         else:
