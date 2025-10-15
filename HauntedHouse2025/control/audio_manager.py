@@ -1,8 +1,12 @@
 # control/audio_manager.py
 # -------------------------------------------------------------------
 # Generation-based audio stop system (epoch cutoff)
-# + HDMI-friendly sample-rate handling and low-RAM channel mapping
-# + WASAPI Exclusive + latency tuning + prebuffering (stutter fix)
+# + Automatic resample to device rate (HDMI-friendly)
+# + Per-block channel mapping (low RAM)
+# + Robust device selection (prefers HDMI/7.1), broader name match
+# + WASAPI Exclusive (when available) with smart fallbacks
+# + Latency tuning + prebuffering (stutter fix)
+# + Debug device listing
 # -------------------------------------------------------------------
 
 from __future__ import annotations
@@ -13,7 +17,7 @@ import tempfile
 import subprocess
 import platform
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List
 
 import numpy as np
 import sounddevice as sd
@@ -26,7 +30,7 @@ from utils.tools import log_event
 
 named_channels: Dict[str, Dict[str, float | int]] = {
     "frontLeft":     {"index": 0, "gain": 1.0},
-    "graveyard":     {"index": 1, "gain": 1.0},
+    "graveyard":     {"index": 1, "gain": 0.6},   # (your log showed 0.60 earlier)
     "center":        {"index": 2, "gain": 1.4},
     "subwoofer":     {"index": 3, "gain": 1.4},
     "swampRoom":     {"index": 4, "gain": 1.6},
@@ -36,8 +40,19 @@ named_channels: Dict[str, Dict[str, float | int]] = {
 }
 
 DEFAULT_SOUND_DIR = (Path(__file__).resolve().parents[3] / "Assets" / "SoundDir").resolve()
-DEFAULT_DEVICE_INDEX: Optional[int] = 11  # your RX-V673 device index
+
+# You can still pass a device index, but on Windows we now *prefer by name + channel count*.
+DEFAULT_DEVICE_INDEX: Optional[int] = None
+
 DEFAULT_TOTAL_CHANNELS = 8
+
+# Device name matching (case-insensitive). You can override with env var AUDIO_DEVICE_SUBSTR.
+DEFAULT_NAME_HINTS: List[str] = [
+    "RX-V673", "YAMAHA", "NVIDIA HIGH DEFINITION AUDIO", "NVIDIA", "HDMI", "AVR", "TV"
+]
+
+# Minimum channels to consider “multichannel/HDMI-like”. This filters out 2-ch headsets.
+MULTICH_MIN_CHANNELS = 6
 
 
 # ---------- Globals (epochs, sessions, state) ----------
@@ -120,8 +135,10 @@ def _resolve_sound_path(wav_or_path: str, base_folder: Optional[Path] = None) ->
     base = Path(base_folder) if base_folder is not None else DEFAULT_SOUND_DIR
     return (base / p).resolve()
 
-def _device_label(idx: int) -> str:
+def _device_label(idx: Optional[int]) -> str:
     try:
+        if idx is None:
+            return "[default] (None)"
         name = sd.query_devices()[idx].get("name", "Unknown")
     except Exception:
         name = "Unknown"
@@ -132,42 +149,145 @@ def _read_audio_mono(file_path: Path) -> tuple[np.ndarray, int]:
     mono = data[:, 0] if data.shape[1] == 1 else data.mean(axis=1)
     return mono.astype("float32", copy=False), int(fs)
 
-def _choose_output_device(preferred_index: int | None) -> Tuple[int | None, int, int]:
+def _get_hostapi_index(name_contains: str) -> Optional[int]:
+    try:
+        for i, h in enumerate(sd.query_hostapis()):
+            if name_contains.lower() in (h.get("name", "").lower()):
+                return i
+    except Exception:
+        pass
+    return None
+
+def _list_devices_debug():
+    try:
+        hostapis = sd.query_hostapis()
+        devices = sd.query_devices()
+        log_event("[Audio] ==== Device Inventory (by host API) ====")
+        for i, h in enumerate(hostapis):
+            log_event(f"[Audio] HostAPI[{i}] {h.get('name','?')}:")
+            for dev_idx in h.get("devices", []):
+                if dev_idx < 0 or dev_idx >= len(devices):
+                    continue
+                d = devices[dev_idx]
+                out_ch = d.get("max_output_channels", 0)
+                in_ch = d.get("max_input_channels", 0)
+                fs = d.get("default_samplerate", 0)
+                log_event(f"[Audio]   dev {dev_idx:>3} | out={out_ch:<2} in={in_ch:<2} "
+                          f"| fs={int(round(float(fs or 0)))} | name='{d.get('name','?')}'")
+        log_event("[Audio] =======================================")
+    except Exception as e:
+        log_event(f"[Audio] Device inventory failed: {e}")
+
+def _pack_device(idx: int) -> Tuple[int, int, int, str]:
+    d = sd.query_devices()[idx]
+    max_out = int(d["max_output_channels"])
+    default_fs = int(round(float(d.get("default_samplerate", 48000.0))))
+    hostapis = sd.query_hostapis()
+    hostapi_name = "unknown"
+    for i, h in enumerate(hostapis):
+        if idx in h.get("devices", []):
+            hostapi_name = h.get("name", "unknown")
+            break
+    log_event(f"[Audio] Using device {_device_label(idx)} (hostapi={hostapi_name}) "
+              f"with {max_out} out @ {default_fs} Hz default")
+    return idx, max_out, default_fs, hostapi_name
+
+def _choose_output_device(preferred_index: int | None,
+                          name_hints: Optional[List[str]] = None
+                         ) -> Tuple[Optional[int], int, int, str]:
     """
-    Returns (device_index, max_output_channels, default_samplerate_int).
+    Robust device selection:
+      - On Windows: prefer WASAPI devices with >= MULTICH_MIN_CHANNELS and names matching hints;
+                    if none, prefer any device with >= MULTICH_MIN_CHANNELS;
+                    else fall back to defaults.
+      - On other OS: preferred index -> default -> first available.
+    Returns (device_index_or_None, max_output_channels, default_samplerate, hostapi_name)
     """
+    _list_devices_debug()  # helpful each run
     devices = sd.query_devices()
+    hints = name_hints or []
+    env_hint = os.getenv("AUDIO_DEVICE_SUBSTR")
+    if env_hint:
+        hints = [env_hint] + hints
+    hints = [h.lower() for h in hints]
 
     def valid_out(idx: int) -> bool:
         return 0 <= idx < len(devices) and devices[idx].get("max_output_channels", 0) > 0
 
-    def _pack(idx: int) -> Tuple[int, int, int]:
-        max_out = int(devices[idx]["max_output_channels"])
-        default_fs = int(round(float(devices[idx].get("default_samplerate", 48000.0))))
-        log_event(f"[Audio] Using device {_device_label(idx)} with {max_out} output channels @ {default_fs} Hz default")
-        return idx, max_out, default_fs
+    def pick_best(candidates: List[int]) -> Optional[int]:
+        """Pick the highest-channel device among candidates."""
+        if not candidates:
+            return None
+        return max(candidates, key=lambda i: int(devices[i].get("max_output_channels", 0)))
 
+    # Windows: search WASAPI first
+    if platform.system() == "Windows":
+        wasapi_idx = _get_hostapi_index("wasapi")
+        if wasapi_idx is not None:
+            h = sd.query_hostapis()[wasapi_idx]
+            wasapi_devs = [i for i in h.get("devices", []) if valid_out(i)]
+
+            # 1) Name match + multichannel first
+            name_match_multi = [
+                i for i in wasapi_devs
+                if any(s in devices[i].get("name","").lower() for s in hints)
+                and int(devices[i].get("max_output_channels",0)) >= MULTICH_MIN_CHANNELS
+            ]
+            choice = pick_best(name_match_multi)
+            if choice is not None:
+                return _pack_device(choice)
+
+            # 2) Any name match
+            name_match_any = [
+                i for i in wasapi_devs
+                if any(s in devices[i].get("name","").lower() for s in hints)
+            ]
+            choice = pick_best(name_match_any)
+            if choice is not None:
+                return _pack_device(choice)
+
+            # 3) Any multichannel (>=6)
+            any_multi = [
+                i for i in wasapi_devs
+                if int(devices[i].get("max_output_channels",0)) >= MULTICH_MIN_CHANNELS
+            ]
+            choice = pick_best(any_multi)
+            if choice is not None:
+                return _pack_device(choice)
+
+            # 4) WASAPI default output if valid
+            def_out = h.get("default_output_device", -1)
+            if valid_out(def_out):
+                return _pack_device(def_out)
+
+        # If WASAPI lookup failed, fall through to generic path
+
+    # Generic path
     if isinstance(preferred_index, int) and valid_out(preferred_index):
-        return _pack(preferred_index)
+        return _pack_device(preferred_index)
 
+    # Prefer any device with MANY channels globally (HDMI/AVR tend to expose 8)
+    many_channels = [i for i in range(len(devices)) if valid_out(i)]
+    many_channels.sort(key=lambda i: int(devices[i].get("max_output_channels", 0)), reverse=True)
+    if many_channels:
+        return _pack_device(many_channels[0])
+
+    # System default
     try:
-        default_in, default_out = sd.default.device
+        _, default_out = sd.default.device
     except Exception:
         default_out = None
-
     if isinstance(default_out, int) and valid_out(default_out):
-        return _pack(default_out)
+        return _pack_device(default_out)
 
+    # First available
     for idx, d in enumerate(devices):
         if d.get("max_output_channels", 0) > 0:
-            return _pack(idx)
+            return _pack_device(idx)
 
     raise RuntimeError("No output audio devices with output channels found.")
 
 def _ensure_samplerate(x: np.ndarray, src_fs: int, dst_fs: int) -> tuple[np.ndarray, int]:
-    """
-    Convert 'x' (mono float32) from src_fs to dst_fs if needed via vectorized interpolation.
-    """
     if src_fs == dst_fs:
         return x, src_fs
     n_src = x.shape[0]
@@ -178,7 +298,65 @@ def _ensure_samplerate(x: np.ndarray, src_fs: int, dst_fs: int) -> tuple[np.ndar
     return y, dst_fs
 
 
-# ---------- Core playback (epoch cutoff, per-block mapping, WASAPI exclusive) ----------
+# ---------- Stream open (robust) ----------
+
+def _open_stream_robust(fs: int, device_index: Optional[int], have_channels: int):
+    """
+    Attempt order:
+      1) If multichannel (>=6) and Windows: WASAPI Exclusive with requested device.
+      2) Same but default device (None).
+      3) Requested device, shared mode.
+      4) Default device, shared mode.
+    """
+    blocksize = max(512, fs // 25)  # ~40 ms @ 48k
+
+    def _mk_extra(exclusive: bool):
+        if platform.system() == "Windows":
+            try:
+                return sd.WasapiSettings(exclusive=exclusive)
+            except Exception:
+                return None
+        return None
+
+    def _try_open(dev, ex, note):
+        log_event(f"[Audio] Opening stream dev={_device_label(dev)}, fs={fs}, ch={max(1, have_channels)}, "
+                  f"exclusive={'yes' if (ex and platform.system()=='Windows') else 'no'} ({note})")
+        return sd.OutputStream(
+            samplerate=fs,
+            device=dev,
+            channels=max(1, have_channels),
+            dtype="float32",
+            blocksize=blocksize,
+            latency=0.06,
+            extra_settings=ex
+        )
+
+    wants_exclusive = (platform.system() == "Windows" and have_channels >= MULTICH_MIN_CHANNELS)
+
+    # Try 1: requested dev + exclusive
+    if wants_exclusive:
+        try:
+            return _try_open(device_index, _mk_extra(True), "try1"), _mk_extra(True), device_index
+        except sd.PortAudioError as e1:
+            log_event(f"[Audio] Open fail try1: {e1}")
+
+        # Try 2: default dev + exclusive
+        try:
+            return _try_open(None, _mk_extra(True), "try2"), _mk_extra(True), None
+        except sd.PortAudioError as e2:
+            log_event(f"[Audio] Open fail try2: {e2}")
+
+    # Try 3: requested dev, shared
+    try:
+        return _try_open(device_index, None, "try3"), None, device_index
+    except sd.PortAudioError as e3:
+        log_event(f"[Audio] Open fail try3: {e3}")
+
+    # Try 4: default dev, shared
+    return _try_open(None, None, "try4"), None, None
+
+
+# ---------- Core playback (epoch cutoff, per-block mapping) ----------
 
 def _play_mono_nonblocking(
     mono: np.ndarray,
@@ -200,29 +378,14 @@ def _play_mono_nonblocking(
     def _worker():
         stream = None
         try:
-            # Slightly larger block + latency to avoid underruns on HDMI
-            blocksize = max(512, fs // 25)  # ~40 ms @ 48k
-            extra = None
-            try:
-                if platform.system() == "Windows":
-                    extra = sd.WasapiSettings(exclusive=True)
-            except Exception:
-                extra = None
-
-            with sd.OutputStream(
-                samplerate=fs,
-                device=device_index,
-                channels=max(1, have_channels),
-                dtype="float32",
-                blocksize=blocksize,
-                latency=0.06,             # ~60 ms device latency
-                extra_settings=extra,      # WASAPI Exclusive on Windows
-            ) as stream:
+            stream, used_extra, used_dev = _open_stream_robust(fs, device_index, have_channels)
+            with stream:
                 with _active_lock:
                     _active_streams.append(stream)
                     _active_sessions.append(session)
 
                 # Prebuffer zeros to fill device FIFO and avoid first-block hiccup
+                blocksize = stream.blocksize or max(512, fs // 25)
                 zero_blk = np.zeros((blocksize, max(1, have_channels)), dtype=np.float32)
                 stream.write(zero_blk)
                 stream.write(zero_blk)
@@ -306,7 +469,7 @@ def play_to_named_channel(
     wav_file: str,
     target_name: str,
     device_index: int | None = DEFAULT_DEVICE_INDEX,
-    total_channels: int = DEFAULT_TOTAL_CHANNELS,  # kept for API compatibility
+    total_channels: int = DEFAULT_TOTAL_CHANNELS,  # legacy param
     gain_override: float | None = None,
     base_folder: Path | str | None = None,
 ) -> None:
@@ -318,7 +481,11 @@ def play_to_named_channel(
     if not file_path.exists():
         raise FileNotFoundError(f"Audio file not found: {file_path}")
 
-    dev_idx, have_channels, dev_fs = _choose_output_device(device_index)
+    # Prefer HDMI / multichannel device; avoid headphones
+    dev_idx, have_channels, dev_fs, hostapi_name = _choose_output_device(
+        device_index,
+        name_hints=DEFAULT_NAME_HINTS,
+    )
 
     target = named_channels[target_name]
     ch_index = int(target["index"])
@@ -337,14 +504,14 @@ def play_to_named_channel(
 
     log_event(
         f"[Audio] Playing '{file_path.name}' -> channel '{target_name}' (idx {use_idx}), "
-        f"gain={gain:.2f}, device={_device_label(dev_idx)}, "
+        f"gain={gain:.2f}, device={_device_label(dev_idx)}, hostapi={hostapi_name}, "
         f"channels={have_channels}, fs_in={src_fs} -> fs_out={out_fs}"
     )
 
     _play_mono_nonblocking(
         mono=mono,
         fs=out_fs,
-        device_index=dev_idx,
+        device_index=dev_idx,     # may be None if we selected hostapi default
         have_channels=have_channels,
         mode="one",
         ch_index=use_idx,
@@ -385,7 +552,10 @@ def play_to_all_channels(
         if not Path(file_path).exists():
             raise FileNotFoundError(f"Audio file not found: {file_path}")
 
-        dev_idx, have_channels, dev_fs = _choose_output_device(device_index)
+        dev_idx, have_channels, dev_fs, hostapi_name = _choose_output_device(
+            device_index,
+            name_hints=DEFAULT_NAME_HINTS,
+        )
 
         if gain_override is not None:
             gain = float(gain_override)
@@ -400,7 +570,8 @@ def play_to_all_channels(
         label = f"file:{Path(file_path).name}" if treat_as_file else f"tts:{str(wav_or_text)[:40]}"
         log_event(
             f"[Audio] Playing {label} -> ALL channels ({have_channels}), "
-            f"gain={gain:.2f}, device={_device_label(dev_idx)}, fs_in={src_fs} -> fs_out={out_fs}"
+            f"gain={gain:.2f}, device={_device_label(dev_idx)}, hostapi={hostapi_name}, "
+            f"fs_in={src_fs} -> fs_out={out_fs}"
         )
 
         _play_mono_nonblocking(

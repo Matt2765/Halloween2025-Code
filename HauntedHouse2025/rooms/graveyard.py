@@ -13,7 +13,7 @@ def run():
 
     while house.HouseActive or house.Demo:
         log_event("[Graveyard] Running loop...")
-        MedallionCallsEvent()
+        #MedallionCallsEvent()
         BeckettsDeathEvent()
         
         for i in range(30):
