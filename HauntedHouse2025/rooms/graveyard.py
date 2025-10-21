@@ -17,7 +17,9 @@ def run():
         for i in range(3):
             t.sleep(1)
             if BreakCheck():
-                return        BeckettsDeathEvent()
+                return        
+            
+        BeckettsDeathEvent()
         
         for i in range(30):
             t.sleep(1)
