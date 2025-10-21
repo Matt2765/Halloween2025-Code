@@ -43,7 +43,7 @@ named_channels: Dict[str, Dict[str, float | int]] = {
 DEFAULT_SOUND_DIR = (Path(__file__).resolve().parents[3] / "Assets" / "SoundDir").resolve()
 
 # Primary output preference (index is optional; automatic selection prefers WASAPI multichannel)
-DEFAULT_DEVICE_INDEX: Optional[int] = 8
+DEFAULT_DEVICE_INDEX: Optional[int] = 3
 DEFAULT_TOTAL_CHANNELS = 8
 
 # Secondary output (optional simultaneous playback). Set via env:

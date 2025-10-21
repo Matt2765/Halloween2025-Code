@@ -17,6 +17,7 @@ from ui.http_server import HTTP_SERVER
 from utils.tools import log_event, BreakCheck
 from rooms import swamp, graveyard
 from control.doors import spawn_doors
+import control.dimmer_controller as dim
 
 def initialize_system():
     while True:
@@ -32,8 +33,11 @@ def initialize_system():
             threading.Thread(target=HTTP_SERVER, daemon=True).start()
             threading.Thread(target=MainGUI, daemon=True).start()
             
-            remote_sensor_monitor.init(port=None, baud=921600)
-            
+            #remote_sensor_monitor.init(port=None, baud=921600)
+            dim.start()
+            if not dim.wait_ready(5):
+               raise RuntimeError("Dimmer not connected")
+
             house.Boot = False
             
         log_event("[System] Initializing non-persistent services...")

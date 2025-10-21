@@ -13,7 +13,7 @@ def run():
 
     while house.HouseActive or house.Demo:
         log_event("[Graveyard] Running loop...")
-        #MedallionCallsEvent()
+        MedallionCallsEvent()
         BeckettsDeathEvent()
         
         for i in range(30):
@@ -39,7 +39,7 @@ def BeckettsDeathEvent():
         if BreakCheck():
             return
         
-    play_to_named_channel_async("CannonDesigned_2.wav", "graveyard", gain_override=1.2)
+    play_to_named_channel_async("CannonDesigned_2.wav", "graveyard", gain_override=1)
     
     for i in range(5):
         t.sleep(1)
@@ -64,7 +64,7 @@ def MedallionCallsEvent():
     
     log_event("[Graveyard] Medallion Calls Event Starting...")
     
-    play_to_named_channel_async("TheMedallionCalls.wav", "graveyard", gain_override=.6)
+    play_to_named_channel_async("TheMedallionCalls.wav", "graveyard", gain_override=.1)
         
     for i in range(17):
         t.sleep(1)
@@ -78,21 +78,21 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
         
-    play_to_named_channel_async("waterWave01.wav", "graveyard", gain_override=1)
+    play_to_named_channel_async("waterWave01.wav", "graveyard", gain_override=.7)
     t.sleep(.8)
-    play_to_named_channel_async("impactDebris01.wav", "graveyard", gain_override=1)
+    play_to_named_channel_async("impactDebris01.wav", "graveyard", gain_override=.7)
         
     for i in range(8): #28.8
         t.sleep(1)
         if BreakCheck():
             return
         
-    play_to_named_channel_async("CannonDesigned_1.wav", "graveyard", gain_override=1.2)
+    play_to_named_channel_async("CannonDesigned_1.wav", "graveyard", gain_override=1)
     for i in range(5): #33.8
         t.sleep(1)
         if BreakCheck():
             return
-    play_to_named_channel_async("CannonDesigned_4.wav", "graveyard", gain_override=1.2)
+    play_to_named_channel_async("CannonDesigned_4.wav", "graveyard", gain_override=1)
     
     t.sleep(.2)
     for i in range(8): #42
@@ -110,12 +110,12 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
         
-    play_to_named_channel_async("CannonDesigned_2.wav", "graveyard", gain_override=1.2)
+    play_to_named_channel_async("CannonDesigned_2.wav", "graveyard", gain_override=1)
     for i in range(6): #55
         t.sleep(1)
         if BreakCheck():
             return
-    play_to_named_channel_async("CannonDesigned_3.wav", "graveyard", gain_override=1.2)
+    play_to_named_channel_async("CannonDesigned_3.wav", "graveyard", gain_override=1)
     
     for i in range(5): #60
         t.sleep(1)
@@ -129,12 +129,12 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
 
-    play_to_named_channel_async("CannonDesigned_4.wav", "graveyard", gain_override=1.2)
+    play_to_named_channel_async("CannonDesigned_4.wav", "graveyard", gain_override=1)
     for i in range(4): #69
         t.sleep(1)
         if BreakCheck():
             return
-    play_to_named_channel_async("CannonDesigned_1.wav", "graveyard", gain_override=1.2)
+    play_to_named_channel_async("CannonDesigned_1.wav", "graveyard", gain_override=1)
     
     for i in range(8): #77
         t.sleep(1)
@@ -150,12 +150,12 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
         
-    play_to_named_channel_async("CannonDesigned_2.wav", "graveyard", gain_override=1.2)
+    play_to_named_channel_async("CannonDesigned_2.wav", "graveyard", gain_override=1)
     for i in range(4): #91
         t.sleep(1)
         if BreakCheck():
             return
-    play_to_named_channel_async("CannonDesigned_4.wav", "graveyard", gain_override=1.2)
+    play_to_named_channel_async("CannonDesigned_4.wav", "graveyard", gain_override=1)
         
     #play_to_named_channel_async("CannonDesigned_1.wav", "graveyard")
     for i in range(16):
@@ -183,5 +183,5 @@ def randCannons():
                   "CannonDesigned_4.wav"]
     while Scripted_Event and house.HouseActive:
         audio = random.choice(audioFiles)
-        play_to_named_channel_async(f"{audio}", "graveyard", gain_override=1.2)
+        play_to_named_channel_async(f"{audio}", "graveyard", gain_override=1)
         t.sleep(random.uniform(10, 20))

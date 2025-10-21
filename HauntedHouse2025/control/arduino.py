@@ -4,7 +4,7 @@ from pymata4 import pymata4
 from utils.tools import log_event
 from context import house
 
-M1PORT = "COM15"
+M1PORT = "COM4"
 M2PORT = "COM12"
 M1 = None
 M2 = None
