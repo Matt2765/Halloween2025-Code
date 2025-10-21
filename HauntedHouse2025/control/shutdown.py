@@ -4,19 +4,13 @@ from utils.tools import log_event
 from context import house
 from control.houseLights import toggleHouseLights
 from control.audio_manager import play_to_all_channels_async, stop_all_audio
-from control.arduino import m1Digital_Write, m2Digital_Write
+from control.arduino import m1Digital_Write
 
 def shutdown():
     log_event("[Shutdown] Executing shutdown routine...")
 
     house.HouseActive = False
     house.testing = False
-
-    log_event("SHUTDOWN - MAIN:")
-    m2Digital_Write(48, 0)
-    log_event("Audio mixer OFF")
-    m2Digital_Write(47, 0)
-    log_event("Smoke Machine OFF")
 
     log_event("SHUTDOWN - gangway:")
     m1Digital_Write(54, 0)
@@ -51,7 +45,6 @@ def shutdown():
     log_event("SR Lightning 5 OFF")
     m1Digital_Write(61, 0)
     log_event("SR Air Explosion 2 OFF")
-    m2Digital_Write(53, 0)
     log_event("SR Swamp Lasers OFF")
     m1Digital_Write(37, 0)
     log_event("SR Overhang Safety OFF")

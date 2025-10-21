@@ -6,11 +6,10 @@ import multiprocessing
 from rooms import cargoHold, gangway, treasureRoom
 from context import house
 from control.audio_manager import play_to_named_channel_async, play_to_all_channels_async
-from control.arduino import connectArduino, m2Digital_Write
+from control.arduino import connectArduino
 from control.shutdown import shutdownDetector
 from control.doors import setDoorState
 from control.houseLights import toggleHouseLights
-from control.sensor_monitor import analog_update_loop
 from control import remote_sensor_monitor
 from ui.gui import MainGUI
 from ui.http_server import HTTP_SERVER
@@ -41,8 +40,6 @@ def initialize_system():
             house.Boot = False
             
         log_event("[System] Initializing non-persistent services...")
-
-        # threading.Thread(target=analog_update_loop, daemon=True).start() # Commented out because hoping to use only remote sensors
                 
         spawn_doors()
 

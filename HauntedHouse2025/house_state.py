@@ -16,8 +16,6 @@ class HouseState:
         self.SRstate = "INACTIVE"
         self.MkRstate = "INACTIVE"
 
-        self.M2AnalogValues = [0] * 16
-
         self.DoorState = {}
         self.DoorSensPins = {}
         self.DoorSolenoidPins = {}

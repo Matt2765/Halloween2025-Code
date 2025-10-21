@@ -2,7 +2,7 @@
 import time as t
 from context import house
 from control.audio_manager import play_to_named_channel_async, play_to_all_channels_async
-from control.arduino import m1Digital_Write, m2Read_Analog
+from control.arduino import m1Digital_Write
 from control.doors import setDoorState
 from utils.tools import BreakCheck, log_event
 from control import remote_sensor_monitor as rsm
