@@ -14,8 +14,10 @@ def run():
     while house.HouseActive or house.Demo:
         log_event("[Graveyard] Running loop...")
         MedallionCallsEvent()
-        t.sleep(3)
-        BeckettsDeathEvent()
+        for i in range(3):
+            t.sleep(1)
+            if BreakCheck():
+                return        BeckettsDeathEvent()
         
         for i in range(30):
             t.sleep(1)
