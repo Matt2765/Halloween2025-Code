@@ -1,7 +1,7 @@
 # rooms/Cargo Hold.py
 import time as t
 from context import house
-from control.audio_manager import play_to_named_channel_async
+from control.audio_manager import play_audio
 from utils.tools import BreakCheck, log_event
 from control import dimmer_controller as dim
 
@@ -12,7 +12,6 @@ def run():
 
     while house.HouseActive or house.Demo:
         log_event("[cargoHold] Running loop...")
-        #play_to_named_channel_async("cannon1.wav", "closetCreak")
 
         dim.dimmer(1,0)
         log_event(f"[cargoHold] Dimmer set to {0}")

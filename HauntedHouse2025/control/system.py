@@ -5,7 +5,7 @@ import multiprocessing
 
 from rooms import cargoHold, gangway, treasureRoom
 from context import house
-from control.audio_manager import play_to_named_channel_async, play_to_all_channels_async
+from control.audio_manager import play_audio
 from control.arduino import connectArduino
 from control.shutdown import shutdownDetector
 from control.doors import setDoorState
@@ -61,7 +61,7 @@ def initialize_system():
 
 def StartHouse():
     if not house.HouseActive and house.systemState == "ONLINE":
-        play_to_all_channels_async("starting house", gain_override=0.1)
+        play_audio("starting house", gain=0.1)
         log_event("[System] Launching main sequence...")
         house.HouseActive = True
 

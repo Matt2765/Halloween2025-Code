@@ -1,7 +1,7 @@
 # rooms/gangway.py
 import time as t
 from context import house
-from control.audio_manager import play_to_named_channel_async, play_to_all_channels_async
+from control.audio_manager import play_audio
 from control.arduino import m1Digital_Write
 from control.doors import setDoorState
 from utils.tools import BreakCheck, log_event
@@ -15,9 +15,8 @@ def run():
         while house.HouseActive or house.Demo:
             if rsm.obstructed("TOF1", block_mm=800, window_ms=250, min_consecutive=2) or house.Demo:
                 print("TRIPPED")
-                play_to_all_channels_async("gangway sensor tripped")
+                play_audio("gangway sensor tripped")
                 setDoorState(1, "CLOPEN")
-                #play_to_named_channel_async("cannon1.wav", "frontLeft")
                 m1Digital_Write(27, 1)  # Start animatronic
                 log_event("[gangway] Activated animatronic 27")
                 t.sleep(5)
