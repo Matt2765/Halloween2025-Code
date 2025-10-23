@@ -4,8 +4,16 @@ from control.arduino import m1Digital_Write
 from utils.tools import log_event
 
 
-def toggleHouseLights(enable: bool):
+def toggleHouseLights(enable: bool = None):
+    """
+    Toggles or sets the house lights.
+    - If 'enable' is True, turns lights ON.
+    - If 'enable' is False, turns lights OFF.
+    - If 'enable' is None (default), toggles the current state.
+    """
+    if enable is None:
+        enable = not house.houseLights
+
     log_event(f"[Lights] House lights {'ON' if enable else 'OFF'}")
     house.houseLights = enable
-    # Example: control pin 13
-    m1Digital_Write(13, 1 if enable else 0)
+    m1Digital_Write(22, 1 if enable else 0)

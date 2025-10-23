@@ -15,7 +15,7 @@ def demoEvent(room):
     log_event(f"[GUI] Starting demo of {room}")
 
     from rooms import swamp, graveyard
-    if room == 'TR':
+    if room == 'GW':
         threading.Thread(target=gangway.run, args=()).start()
     elif room == 'TR':
         threading.Thread(target=treasureRoom.run, args=()).start()
@@ -55,7 +55,7 @@ def MainGUI():
     tk.Button(root, text="Open Door 3", height=2, width=15, command=lambda: setDoorState(3, "OPEN")).place(x=25, y=335)
     tk.Button(root, text="Close Door 3", height=2, width=15, command=lambda: setDoorState(3, "CLOSED")).place(x=150, y=335)
 
-    tk.Button(root, text="Demo gangway", height=2, width=15, command=lambda: demoEvent('TR')).place(x=150, y=430)
+    tk.Button(root, text="Demo gangway", height=2, width=15, command=lambda: demoEvent('GW')).place(x=150, y=430)
     tk.Button(root, text="Demo Swamp Room", height=2, width=15, command=lambda: demoEvent('SR')).place(x=25, y=430)
     tk.Button(root, text="Demo Graveyard", height=2, width=15, command=lambda: demoEvent('GY')).place(x=275, y=430)
     tk.Button(root, text="Demo Treasure Room", height=2, width=15, command=lambda: demoEvent("TR")).place(x=25, y=480)

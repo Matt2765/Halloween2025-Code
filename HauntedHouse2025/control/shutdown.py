@@ -12,58 +12,74 @@ def shutdown():
     house.HouseActive = False
     house.testing = False
 
-    log_event("SHUTDOWN - gangway:")
-    m1Digital_Write(54, 0)
-    log_event("TR Air Blast 4 OFF")
-    m1Digital_Write(27, 0)
-    log_event("TR Ambient Lights 1 OFF")
-    m1Digital_Write(35, 0)
-    log_event("TR Lightning 1 OFF")
-    m1Digital_Write(34, 0)
-    log_event("TR Lightning 2 OFF")
-    m1Digital_Write(36, 0)
-    log_event("Can Lights OFF")
-    m1Digital_Write(32, 0)
-    log_event("TR Strobe 2 OFF")
-    m1Digital_Write(30, 0)
-    log_event("TR Swamp Monster Light OFF")
-    m1Digital_Write(55, 0)
-    log_event("TR Swamp Monster Solenoid OFF")
+    def _dim_off(ch: int):
+        for fn_name in ("dim_set", "setDimLevel", "set_dimmer_level", "dimmer_set", "set_dimmer", "setDimmer"):
+            fn = globals().get(fn_name)
+            if callable(fn):
+                try:
+                    fn(ch, 0)
+                    return True
+                except Exception:
+                    pass
+        return False
 
-    log_event("SHUTDOWN - TREASURE ROOM:")
-    m1Digital_Write(41, 0)
-    log_event("TR Ambient Lights 2 OFF")
-    m1Digital_Write(31, 0)
-    log_event("TR Treasure Room Light OFF")
+    # ---------------- Gangway ----------------
+    log_event("SHUTDOWN - Gangway:")
+    m1Digital_Write(47, 1); log_event("+12v Door, Solenoid A OFF")
+    m1Digital_Write(33, 1); log_event("+12v Ambient Lights A OFF")
+    m1Digital_Write(35, 1); log_event("+120v Strobe A OFF")
 
-    log_event("SHUTDOWN - SWAMP ROOM:")
-    m1Digital_Write(40, 0)
-    log_event("SR Lightning 3 OFF")
-    m1Digital_Write(24, 0)
-    log_event("SR Lightning 4 OFF")
-    m1Digital_Write(28, 0)
-    log_event("SR Lightning 5 OFF")
-    m1Digital_Write(61, 0)
-    log_event("SR Air Explosion 2 OFF")
-    log_event("SR Swamp Lasers OFF")
-    m1Digital_Write(37, 0)
-    log_event("SR Overhang Safety OFF")
-    m1Digital_Write(62, 0)
-    log_event("Bu Forward OFF")
-    m1Digital_Write(63, 0)
-    log_event("Bu Up/Down OFF")
+    # ---------------- Treasure Room ----------------
+    log_event("SHUTDOWN - Treasure Room:")
+    if _dim_off(4): log_event("+120v Ambient Lighting (G) DIM CH.4 OFF")
+    m1Digital_Write(2, 1);  log_event("+120v Strobe 3 (G) OFF")
+    m1Digital_Write(26, 1); log_event("+120v Lightning (G) OFF")
+    m1Digital_Write(24, 1); log_event("+120v Blacklight (G) OFF")
 
-    log_event("SHUTDOWN - CARGO HOLD:")
-    m1Digital_Write(33, 0)
-    log_event("MkR Ambient Light 4 Blacklight OFF")
-    m1Digital_Write(23, 0)
-    log_event("MkR Strobe 3 OFF")
-    m1Digital_Write(59, 0)
-    log_event("MkR Air Blast 3 OFF")
+    # ---------------- Quarterdeck ----------------
+    log_event("SHUTDOWN - Quarterdeck:")
+    m1Digital_Write(23, 1); log_event("+120v Ambient Light 3 (B) OFF")
+    m1Digital_Write(53, 1); log_event("+12v Prisoner Arms (F) OFF")
+    m1Digital_Write(38, 1); log_event("+12v Door, Solenoid F OFF")
+    if _dim_off(1): log_event("+120v Drop Down Light (B) DIM CH.1 OFF")
 
-    log_event("SHUTDOWN - GRAVEYARD:")
-    m1Digital_Write(57, 0)
-    log_event("GY Rock Spider Solenoid OFF")
+    # ---------------- Graveyard ----------------
+    log_event("SHUTDOWN - Graveyard:")
+    m1Digital_Write(45, 1); log_event("+12v Enemy Cannon Solenoid (L) OFF")
+    m1Digital_Write(58, 1); log_event("+120v Enemy Cannon Smoke Machine (L) OFF")
+    m1Digital_Write(31, 1); log_event("+120v Enemy Cannon Muzzle Flash (L) OFF")
+    m1Digital_Write(40, 1); log_event("+12v Water Blast (M) OFF")
+    if _dim_off(5): log_event("+120v Ship Lights 1 (M) DIM CH.5 OFF")
+    if _dim_off(6): log_event("+120v Ship Lights 2 (M) DIM CH.6 OFF")
+
+    # ---------------- Cargo Hold ----------------
+    log_event("SHUTDOWN - Cargo Hold:")
+    m1Digital_Write(49, 1); log_event("+12v Barrel Solenoid (D) OFF")
+    m1Digital_Write(30, 1); log_event("+120v Lightning (D) OFF")
+    m1Digital_Write(51, 1); log_event("+12v Rowing Skeleton Motor (D) OFF")
+    m1Digital_Write(28, 1); log_event("+120v Ambient Light 6 (D) OFF")
+    m1Digital_Write(39, 1); log_event("+12v Cannon 1 Solenoid (I) OFF")
+    m1Digital_Write(25, 1); log_event("+120v Cannon 1 Muzzle Flash (I) OFF")
+    m1Digital_Write(61, 1); log_event("Cannon 1 Smoke Machine (I) OFF")
+    m1Digital_Write(41, 1); log_event("+12v Cannon 2 Solenoid (H) OFF")
+    m1Digital_Write(27, 1); log_event("+120v Cannon 2 Muzzle Flash (H) OFF")
+    m1Digital_Write(60, 1); log_event("Cannon 2 Smoke Machine (H) OFF")
+
+    # ---------------- Brig ----------------
+    log_event("SHUTDOWN - Brig:")
+    m1Digital_Write(37, 1); log_event("+120v Ambient Lights 2 (C) OFF")
+    m1Digital_Write(36, 1); log_event("+120v Strobe 6 (C) OFF")
+    m1Digital_Write(34, 1); log_event("+120v Strobe 4 / Blacklight (C) OFF")
+    if _dim_off(3): log_event("+120v Ambient Light 7 (C) DIM CH.3 OFF")
+
+    # ---------------- Deck ----------------
+    log_event("SHUTDOWN - Deck:")
+    m1Digital_Write(43, 1); log_event("+12v Falling Mast Solenoid (E) OFF")
+    m1Digital_Write(29, 1); log_event("+120v Lightning (E) OFF")
+    m1Digital_Write(59, 1); log_event("Fire Lights Smoke Machine (E) OFF")
+    m1Digital_Write(32, 1); log_event("+120v Strobes (K) OFF")
+    if _dim_off(2): log_event("+120v Fire Lights (K) DIM CH.2 OFF")
+    if _dim_off(7): log_event("+120v Ambient Lights (K) DIM CH.7 OFF")
 
     t.sleep(1)
     toggleHouseLights(True)
@@ -81,9 +97,9 @@ def shutdownDetector():
         play_audio("emergency shutdown activated", gain=0.1)
         shutdown()
         for _ in range(3):
-            toggleHouseLights(True)
-            t.sleep(0.25)
             toggleHouseLights(False)
+            t.sleep(0.25)
+            toggleHouseLights(True)
             t.sleep(0.25)
         while True:
             input1 = input().upper()
@@ -105,9 +121,9 @@ def shutdownDetector():
         play_audio("soft shutdown activated", gain=0.1)
         shutdown()
         for _ in range(3):
-            toggleHouseLights(True)
-            t.sleep(0.25)
             toggleHouseLights(False)
+            t.sleep(0.25)
+            toggleHouseLights(True)
             t.sleep(0.25)
         play_audio(f"returning to standby in 5 seconds", gain=0.1)
         for a in range(5, 0, -1):

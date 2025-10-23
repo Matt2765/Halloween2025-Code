@@ -17,6 +17,7 @@ from utils.tools import log_event, BreakCheck
 from rooms import swamp, graveyard
 from control.doors import spawn_doors
 import control.dimmer_controller as dim
+from control.shutdown import shutdown
 
 def initialize_system():
     while True:
@@ -27,6 +28,8 @@ def initialize_system():
             connectArduino()
             
             t.sleep(1)
+
+            shutdown()
 
             # Launch core services
             threading.Thread(target=HTTP_SERVER, daemon=True).start()
@@ -40,6 +43,8 @@ def initialize_system():
             house.Boot = False
             
         log_event("[System] Initializing non-persistent services...")
+
+        toggleHouseLights(True)
                 
         spawn_doors()
 

@@ -7,7 +7,7 @@ class HouseState:
         self.Demo = False
         self.SOUND = True
         self.testing = False
-        self.houseLights = False
+        self.houseLights = True
         self.FRthreadRunning = False
         self.remote_sensor_value = None
 
@@ -17,8 +17,7 @@ class HouseState:
         self.MkRstate = "INACTIVE"
 
         self.DoorState = {}
-        self.DoorSensPins = {}
-        self.DoorSolenoidPins = {}
+        self.TargetDoorState = {}
 
         self.smokeSequence = 1
         self.laserSequence = False

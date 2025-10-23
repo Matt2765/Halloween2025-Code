@@ -4,18 +4,14 @@ import threading
 from control.arduino import m1Digital_Write
 from utils.tools import log_event, BreakCheck
 from context import house
+from control import remote_sensor_monitor as rsm
 
-DOOR_SOLENOID_PINS = {
-    1: 23,
-    2: 25,
-    3: 26
-}
+DOOR_SOLENOID_PINS = {1: 23, 2: 25, 3: 26}
+DOOR_SENSOR_IDS = {1: "TOF1", 2: "TOF2", 3: "TOF3"}
 
-DOOR_SENSOR_IDS = {
-    1: "TOF1",
-    2: "TOF2",
-    3: "TOF3"
-}
+OBSTRUCT_RETRY_DELAY_S = 3.0
+CLOSE_MONITOR_WINDOW_S = 7.5
+SENSOR_POLL_S = 0.1
 
 def setDoorState(id, state):
     if id in (1, 2, 3) and state in ("OPEN", "CLOPEN", "CLOSED"):
@@ -26,96 +22,62 @@ def setDoorState(id, state):
 
 def door_process(id):
     log_event(f"[Doors] Door {id} process created.")
+    pin = DOOR_SOLENOID_PINS[id]
+
+    def door_sensor_obstructed():
+        return rsm.obstructed(DOOR_SENSOR_IDS[id], block_mm=800, window_ms=250, min_consecutive=2)
 
     def open():
-        target_state = house.DoorState[id]
-        m1Digital_Write(DOOR_SOLENOID_PINS[id], 1)
-        log_event(f"[Doors] Door {id} opening...")
-        for _ in range(12):
-            if house.DoorState[id] != target_state:
-                return False
-            t.sleep(0.5)
+        m1Digital_Write(pin, 1)
         house.DoorState[id] = "OPEN"
-        log_event(f"[Doors] Door {id} OPEN")
-        return True
+        log_event(f"[Doors] Door {id} opened.")
 
-    def open_fast():
-        target_state = house.DoorState[id]
-        m1Digital_Write(DOOR_SOLENOID_PINS[id], 1)
-        log_event(f"[Doors] Door {id} fast opening...")
-        for _ in range(4):
-            if house.DoorState[id] != target_state:
-                return False
-            t.sleep(0.5)
-        house.DoorState[id] = "OPEN"
-        log_event(f"[Doors] Door {id} OPEN")
-        return True
-
-    def close():
-        target_state = house.DoorState[id]
-        m1Digital_Write(DOOR_SOLENOID_PINS[id], 0)
-        log_event(f"[Doors] Door {id} closing...")
-        for _ in range(5):
-            door_sensor_check()
-            t.sleep(0.1)
-        for _ in range(16):
-            if door_sensor_check():
-                return False
-            if house.DoorState[id] != target_state:
-                log_event(f"[Doors] Door {id} interrupted")
-                return "ChangeTarget"
-            t.sleep(0.3)
+    def close_attempt_until_clear():
+        m1Digital_Write(pin, 0)
+        start = t.time()
+        while t.time() - start < CLOSE_MONITOR_WINDOW_S and house.systemState == "ONLINE":
+            if BreakCheck(): return False
+            if door_sensor_obstructed():
+                # obstruction → reopen, wait, retry
+                house.DoorState[id] = "CLOPEN"
+                log_event(f"[Doors] Door {id} obstruction detected. Re-opening, waiting, and retrying.")
+                m1Digital_Write(pin, 1)
+                t.sleep(OBSTRUCT_RETRY_DELAY_S)
+                m1Digital_Write(pin, 0)
+                start = t.time()  # restart monitor window after retry
+            t.sleep(SENSOR_POLL_S)
+        # after window with no obstructions, consider closed
         house.DoorState[id] = "CLOSED"
-        log_event(f"[Doors] Door {id} CLOSED")
+        log_event(f"[Doors] Door {id} closed successfully.")
         return True
 
-    def door_sensor_check():
-        #replace with remote sensor check
-        return 
-
-    def handle_change(last_state):
-        if house.DoorState[id] == "OPEN":
-            if not open():
-                log_event(f"[Doors] Door {id} interrupted during open")
-                return handle_change(last_state)
-            return "OPEN"
-
-        elif house.DoorState[id] == "CLOPEN":
+    def handle_change():
+        target = house.TargetDoorState[id]
+        if target == "OPEN":
             open()
-            delay = 12 if id in (2, 3) else 6
-            for _ in range(delay):
-                if BreakCheck():
-                    return "CLOSED"
-                t.sleep(1)
-            while True:
-                if BreakCheck():
-                    return "CLOSED"
-                if not close():
-                    log_event(f"[Doors] Door {id} obstructed, reopening")
-                    open_fast()
-                    t.sleep(1)
-                    house.DoorState[id] = "CLOSED"
-                    return handle_change(last_state)
-                return "CLOSED"
-
-        else:
-            result = close()
-            if not result:
-                log_event(f"[Doors] Door {id} obstructed, reopening")
-                open_fast()
-                house.DoorState[id] = "CLOSED"
-                return handle_change(last_state)
-            if result == "ChangeTarget":
-                return handle_change(last_state)
-            return "CLOSED"
+        elif target == "CLOSED":
+            # keep retrying until closed or system goes offline/BreakCheck
+            while house.systemState == "ONLINE" and house.TargetDoorState[id] == "CLOSED":
+                if BreakCheck(): break
+                if door_sensor_obstructed():
+                    # If already obstructed before moving, open, wait, then try
+                    house.DoorState[id] = "CLOPEN"
+                    log_event(f"[Doors] Door {id} obstruction present before close. Opening and delaying.")
+                    m1Digital_Write(pin, 1)
+                    t.sleep(OBSTRUCT_RETRY_DELAY_S)
+                if close_attempt_until_clear():
+                    break
+        elif target == "CLOPEN":
+            # Treat as: open now, then caller may set CLOSED later
+            open()
 
     def main():
-        last_state = "OPEN"
+        house.DoorState[id] = "OPEN"
         while house.systemState == "ONLINE":
-            if last_state != house.DoorState[id]:
-                last_state = handle_change(last_state)
-                t.sleep(0.5)
-            t.sleep(0.5)
+            if house.DoorState[id] != house.TargetDoorState[id]:
+                handle_change()
+            if BreakCheck(): break
+            t.sleep(0.1)
         log_event(f"[Doors] System shutdown: Door {id} exiting and opening")
         open()
 
@@ -125,5 +87,5 @@ def door_process(id):
 def spawn_doors():
     for door_id in DOOR_SOLENOID_PINS.keys():
         house.DoorState[door_id] = "OPEN"
-        threading.Thread(target=door_process,args=(door_id,),daemon=True).start()
+        threading.Thread(target=door_process, args=(door_id,), daemon=True).start()
     log_event("[Doors] All door threads started.")
