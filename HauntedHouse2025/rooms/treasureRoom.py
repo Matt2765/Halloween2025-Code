@@ -19,7 +19,13 @@ def run():
             if BreakCheck():
                 return
 
-        dimmer4_fire(10)
+        dim.dimmer_flicker(
+            channel=4,
+            duration_s=10, 
+            intensity_min=20, 
+            intensity_max=60, 
+            flicker_length_min=0.05, 
+            flicker_length_max=0.18)
 
         for i in range(10):
             t.sleep(1)
@@ -40,7 +46,14 @@ def run():
 
         m1Digital_Write(2, 1);  log_event("+120v Strobe 3 (G) OFF")
 
-        dimmer4_fire(500)
+        dim.dimmer_flicker(
+            channel=4,
+            duration_s=500, 
+            intensity_min=20, 
+            intensity_max=60, 
+            flicker_length_min=0.05, 
+            flicker_length_max=0.18
+        )
 
         for i in range(500):
             t.sleep(1)
@@ -53,22 +66,4 @@ def run():
 
     house.TRstate = "INACTIVE"
     log_event("[treasureRoom] Exiting.")
-
-def dimmer4_fire(duration_s: float) -> threading.Thread:
-    """
-    Flicker DIM CH.4 between 10–50 (fire effect) for duration_s seconds.
-    Stops early if BreakCheck() returns True.
-    """
-    def _run():
-        end = t.time() + float(duration_s)
-        while t.time() < end:
-            if BreakCheck():
-                return
-            dim.dimmer(4, random.randint(20, 60))  # intensity must be a number, not a list
-            t.sleep(random.uniform(0.05, 0.18))
-        dim.dimmer(4, 0)
-
-    th = threading.Thread(target=_run, daemon=True)
-    th.start()
-    return th
 

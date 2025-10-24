@@ -2,6 +2,7 @@
 from context import house
 from control.arduino import m1Digital_Write
 from utils.tools import log_event
+from control.dimmer_controller import dimmer
 
 
 def toggleHouseLights(enable: bool = None):
@@ -17,3 +18,5 @@ def toggleHouseLights(enable: bool = None):
     log_event(f"[Lights] House lights {'ON' if enable else 'OFF'}")
     house.houseLights = enable
     m1Digital_Write(22, 1 if enable else 0)
+    dimmer(2, 100 if enable else 0) #fire lights for deck illumination
+    dimmer(7, 100 if enable else 0) #ambient lights for deck illumination

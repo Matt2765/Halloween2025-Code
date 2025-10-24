@@ -5,6 +5,8 @@ from control.audio_manager import play_audio
 from utils.tools import BreakCheck, log_event
 import random
 import threading
+from control.dimmer_controller import dimmer, dimmer_flicker
+from control.arduino import m1Digital_Write
 
 Scripted_Event = False
 
@@ -13,13 +15,16 @@ def run():
 
     while house.HouseActive or house.Demo:
         log_event("[Graveyard] Running loop...")
-        MedallionCallsEvent()
+
+        testEvent()
+
+        #MedallionCallsEvent()
         for i in range(3):
             t.sleep(1)
             if BreakCheck():
                 return        
             
-        BeckettsDeathEvent()
+        #BeckettsDeathEvent()
         
         for i in range(30):
             t.sleep(1)
@@ -194,3 +199,234 @@ def randCannons():
         audio = random.choice(audioFiles)
         play_audio("graveyard", audio, gain=1)
         t.sleep(random.uniform(10, 20))
+
+
+def testEvent():
+    global Scripted_Event 
+    Scripted_Event = True
+    
+    log_event("[Graveyard] Test Event Starting...")
+
+    t.sleep(1)
+
+    '''dimmer_flicker(     # ambient lights flicker
+        channel=4,
+        duration_s=10, 
+        intensity_min=45, 
+        intensity_max=70, 
+        flicker_length_min=0.1, 
+        flicker_length_max=0.5
+    )
+
+    dimmer_flicker(     # ambient lights flicker
+        channel=2,
+        duration_s=10, 
+        intensity_min=45, 
+        intensity_max=70, 
+        flicker_length_min=0.1, 
+        flicker_length_max=0.5
+    )
+
+    dimmer_flicker(     # ambient lights flicker
+        channel=7,
+        duration_s=10, 
+        intensity_min=45, 
+        intensity_max=70, 
+        flicker_length_min=0.1, 
+        flicker_length_max=0.5
+    )'''
+
+    dimmer(4, 35)  # Treasure room lights (remove later)
+    t.sleep(2)
+    dimmer(2, 100)  # Fire lights
+    t.sleep(2)
+    #m1Digital_Write(32, 0)  # Deck strobe
+    #m1Digital_Write(29, 0)  # Deck lightning
+    dimmer(7, 100)  # Ambient lights
+    t.sleep(2)
+    dimmer(4, 100)  # Treasure room lights (remove later)
+    t.sleep(2)
+    dimmer(4, 50)  # Treasure room lights (remove later)
+
+    t.sleep(2)
+    dimmer(2, 75)  # Fire lights
+    t.sleep(2)
+    #m1Digital_Write(32, 0)  # Deck strobe
+    #m1Digital_Write(29, 0)  # Deck lightning
+    dimmer(7, 50)  # Ambient lights
+    t.sleep(2)
+    while True:
+        dimmer(4, 100)  # Treasure room lights (remove later)
+        t.sleep(2)
+        dimmer(4, 75)  # Treasure room lights (remove later)
+        t.sleep(2)
+        dimmer(4, 70)  # Treasure room lights (remove later)
+        t.sleep(2)
+        dimmer(4, 67)  # Treasure room lights (remove later)
+        t.sleep(2)
+
+    return
+
+
+    for i in range(5):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    dimmer(2, 0)  # Fire lights
+    m1Digital_Write(32, 1)  # Deck strobe
+    m1Digital_Write(29, 1)  # Deck lightning
+    dimmer(7, 0)  # Ambient lights
+        
+    dimmer_flicker(     # ambient lights flicker
+        channel=7,
+        duration_s=10, 
+        intensity_min=45, 
+        intensity_max=70, 
+        flicker_length_min=0.1, 
+        flicker_length_max=0.5
+    )
+
+    for i in range(10):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    threading.Thread(target=lightning_bolt, daemon=True).start()
+        
+    dimmer_flicker(     # ambient lights flicker
+        channel=7,
+        duration_s=2, 
+        intensity_min=0, 
+        intensity_max=40, 
+        flicker_length_min=0.01, 
+        flicker_length_max=0.08
+    )
+    
+    for i in range(2):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    dimmer_flicker(
+        channel=7,
+        duration_s=5, 
+        intensity_min=45, 
+        intensity_max=70, 
+        flicker_length_min=0.1, 
+        flicker_length_max=0.5
+    )
+
+    for i in range(5):
+        t.sleep(1)
+        if BreakCheck():
+            return
+
+    threading.Thread(target=lightning_bolt, daemon=True).start()
+
+    dimmer_flicker(     # ambient lights flicker
+        channel=7,
+        duration_s=2, 
+        intensity_min=0, 
+        intensity_max=40, 
+        flicker_length_min=0.01, 
+        flicker_length_max=0.08
+    )
+
+    for i in range(2):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    dimmer_flicker(
+        channel=7,
+        duration_s=6, 
+        intensity_min=45, 
+        intensity_max=70, 
+        flicker_length_min=0.2, 
+        flicker_length_max=0.5
+    )
+
+    dimmer_flicker(     # fire lights flicker
+        channel=2,
+        duration_s=6, 
+        intensity_min=0, 
+        intensity_max=20, 
+        flicker_length_min=0.09, 
+        flicker_length_max=0.3
+    )
+
+    for i in range(6):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    dimmer(7,0)  # Ambient lights OFF
+
+    dimmer_flicker(     # fire lights flicker
+        channel=2,
+        duration_s=3, 
+        intensity_min=15, 
+        intensity_max=30, 
+        flicker_length_min=0.09, 
+        flicker_length_max=0.3
+    )
+
+    for i in range(3):
+        t.sleep(1)
+        if BreakCheck():
+            return
+
+    dimmer_flicker(     # fire lights flicker
+        channel=2,
+        duration_s=3, 
+        intensity_min=30, 
+        intensity_max=45, 
+        flicker_length_min=0.09, 
+        flicker_length_max=0.3
+    )
+
+    for i in range(3):
+        t.sleep(1)
+        if BreakCheck():
+            return
+
+    dimmer_flicker(     # fire lights flicker
+        channel=2,
+        duration_s=60, 
+        intensity_min=30, 
+        intensity_max=50, 
+        flicker_length_min=0.09, 
+        flicker_length_max=0.3
+    )
+    
+    for i in range(60):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    log_event("[Graveyard] Test Event Ending...")
+    Scripted_Event = False
+
+def lightning_bolt():
+    log_event("[Graveyard] Lightning Bolt Triggered")
+
+    m1Digital_Write(32, 0)  # Deck strobe
+
+    m1Digital_Write(29, 0)  # Deck lightning ON
+    t.sleep(0.1)
+    m1Digital_Write(29, 1)  # Deck lightning OFF
+    t.sleep(1.1)
+    m1Digital_Write(29, 0)  # Deck lightning ON
+    t.sleep(0.07)
+    m1Digital_Write(29, 1)  # Deck lightning OFF
+    t.sleep(.5)
+    m1Digital_Write(29, 0)  # Deck lightning ON
+    t.sleep(0.07)
+    m1Digital_Write(29, 1)  # Deck lightning OFF
+    t.sleep(.5)
+    m1Digital_Write(29, 0)  # Deck lightning ON
+    t.sleep(0.07)
+    m1Digital_Write(29, 1)  # Deck lightning OFF
+
+    m1Digital_Write(32, 1)  # Deck strobe
