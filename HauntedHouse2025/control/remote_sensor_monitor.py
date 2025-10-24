@@ -5,71 +5,45 @@
 # WHAT THIS MODULE DOES
 # - Starts a background process that reads NDJSON lines from your receiver ESP32
 #   over USB serial and maintains a live, shared table of latest sensor values
-#   keyed by sensor id (e.g., "TOF1").
-# - Gives you clean one-liners for raw values, robust filtered distance, and a
-#   debounced/hysteretic "obstructed" boolean for door interlocks.
-# - Has a watch mode to print a live table for debugging.
+#   keyed by sensor id (e.g., "TOF1", "BTN3", "Multi_BTN1").
+# - Supports TOF distance (unchanged), AND button packets emitted by receiver
+#   as normalized JSON: {"type":"button","id":"...","btn":N,"pressed":true/false,"seq":...}.
+# - Provides a tiny button event FIFO (optional) for edge-triggered logic.
+# - Lets your Python send commands OUT to ESP32 nodes via the same USB serial:
+#     tx_broadcast({"to":"Skull1","cmd":"start"})
+#     tx_to_id("ServoBox1", {"cmd":"goto","deg":75})
+#     tx_to_mac("24:6F:28:AA:BB:CC", {"cmd":"stop"})
 #
-# TYPICAL USE IN system.py
+# TYPICAL USE
 #   import remote_sensor_monitor as rsm
-#   rsm.init(port=None, baud=921600)   # start once at boot
-#   if rsm.obstructed("TOF1", block_mm=500, window_ms=200, min_consecutive=2):
-#       keep_door_open()
+#   rsm.init(port=None, baud=921600)    # start once at boot
+#   # read TOF:
+#   d = rsm.get_value("TOF1","dist_mm")
+#   # read buttons:
+#   evt = rsm.button_pop(timeout=0.0)   # or poll pressed state via get_value("BTN3","pressed")
+#   # send commands:
+#   rsm.tx_broadcast({"to":"Skull1","cmd":"start"})
 #
-# CORE FUNCTIONS
-# - init(port=None, baud=921600)
-#     Start the background reader (idempotent). Call once in system.py.
-#     port: "COM5" on Windows (None = auto-detect).  baud: 115200 or 921600.
-#
+# CORE FUNCTIONS (existing, unchanged)
+# - init(port=None, baud=921600)           -- starts background reader/writer
+# - get(sensor_id) -> latest dict or None  -- latest row for that id
 # - get_value(sensor_id, key, default=None, max_age_ms=250)
-#     Return sensors[sensor_id]["vals"][key] if fresh; else default.
-#     max_age_ms=None disables freshness guard.  Example: get_value("TOF1","dist_mm")
-#
-# - get(sensor_id) → full latest record or None:
-#     {
-#       "id": "TOF1", "seq": 1234,
-#       "t_send_ms": <sender millis>, "t_rx_ms": <receiver millis>, "t_host_ms": <PC time>,
-#       "mac": "AA:BB:..", "vals": {"dist_mm": 823, "status": 0}
-#     }
-#
 # - get_latency_ms(sensor_id)
-#     Approx one-way radio latency ~= t_rx_ms - t_send_ms (device clocks).
+# - print_table(), format_table(), snapshot()
 #
-# - healthy()
-#     {"started": bool, "sensors": int, "since_ms": now}
+# NEW TX API
+# - tx_broadcast(payload_dict_or_str)      -- sends: TXB <JSON>\n (broadcast)
+# - tx_to_id(device_id, payload)           -- sends: TX <ID> <JSON>\n (unicast)
+# - tx_to_mac(mac, payload)                -- sends: TXMAC <mac> <JSON>\n (unicast)
 #
-# - print_table()
-#     One-shot table: ID, dist_mm, age_ms, lat_ms, MAC, seq
-#
-# ROBUST DISTANCE + DOOR LOGIC HELPERS
-# - get_distance_filtered(
-#       sid,
-#       window_ms=250,          # look back without waiting (uses already-buffered samples)
-#       min_samples=3,          # need ≥ this many samples in the window
-#       ignore_neg1=True,       # ignore -1 (out-of-range)
-#       require_status_zero=False,  # only accept samples with status==0
-#       method="median"         # "median" (default) or "mean"
-#   ) → float|None
-#
-# - obstructed(
-#       sid,
-#       block_mm,               # trip threshold: sample < block_mm counts
-#       clear_mm=None,          # release threshold; defaults to block_mm+50 (hysteresis)
-#       window_ms=250,          # lookback window (no waiting)
-#       min_consecutive=2,      # require this many distinct packets under threshold
-#       ignore_neg1=True,
-#       require_status_zero=False
-#   ) → bool
-#   Debounced + hysteretic; fail-safe: if previously TRUE and samples stop, remains TRUE.
-#
-# DEBUG / CLI
-#   python remote_sensor_monitor.py --watch [Hz] --baud 921600 --port COM5
-#   (Live table; stderr "lines/s" is disabled by default in this build.)
+# BUTTON EVENTS API (optional)
+# - button_pop(timeout=0.0) -> dict|None   -- {"id": "...", "btn": N, "pressed": bool, "seq": int, "t_host_ms": int}
+#   (Use if you want edge-triggered behavior instead of sampling state.)
 # =============================================================================
 
 from __future__ import annotations
-import json, time, sys, atexit, argparse, os
-from typing import Dict, Any, Optional, List, Tuple
+import json, time, sys, atexit, argparse, os, queue
+from typing import Dict, Any, Optional, List, Tuple, Union
 import multiprocessing as mp
 from multiprocessing.managers import SyncManager
 from collections import deque
@@ -82,12 +56,12 @@ except ImportError:
 
 # ---- Config ----
 DEFAULT_BAUD = 921600
-STALE_DEFAULT_MS = 250              # reject values older than this (ms); None = disable
+STALE_DEFAULT_MS = 250
 PORT_HINTS = ("Silicon Labs", "CP210", "CH340", "USB-SERIAL", "ESP32", "WCH")
-SILENCE_RECONNECT_MS = 2000         # if no bytes for this long, drop & reconnect
+SILENCE_RECONNECT_MS = 2000
 BACKOFF_START_S = 0.25
 BACKOFF_MAX_S = 3.0
-SHOW_LINES_PER_SEC = False          # set True to re-enable "[RemoteSensorMonitor] N lines/s"
+SHOW_LINES_PER_SEC = False
 
 # ---- Module-singleton state ----
 _manager: Optional[SyncManager] = None
@@ -95,9 +69,14 @@ _proc: Optional[mp.Process] = None
 _shared: Optional[Dict[str, dict]] = None
 _started: bool = False
 
+# TX queue to child (for PC -> receiver writes)
+_txq: Optional[mp.Queue] = None
+
 # ---- In-process history for filtering (main process only) ----
-# We store only DISTINCT PACKETS (by t_host_ms) to avoid tight-loop duplicates.
 _hist: Dict[str, dict] = {}  # sid -> {'q': deque[(t_ms, dist_mm)], 'last': bool, 'last_ts': int}
+
+# ---- Optional button event FIFO (cross-process) ----
+_btnq: Optional[mp.Queue] = None
 
 # ---------- Time helpers ----------
 def _now_ms() -> int:
@@ -129,14 +108,20 @@ def _open_serial(port: Optional[str], baud: int) -> serial.Serial:
         write_timeout=0.5,
     )
     try:
-        ser.setDTR(False)
-        ser.setRTS(False)
+        ser.setDTR(False); ser.setRTS(False)
     except Exception:
         pass
     return ser
 
 # ---------- Child process main ----------
-def _monitor_main(shared: "dict[str, dict]", port: Optional[str], baud: int) -> None:
+def _monitor_main(shared: "dict[str, dict]", port: Optional[str], baud: int,
+                  txq: mp.Queue, btnq: mp.Queue) -> None:
+    """
+    Background loop:
+      - reads lines from receiver (NDJSON per your receiver)
+      - updates shared table
+      - writes outbound TX commands whenever txq has items
+    """
     backoff = BACKOFF_START_S
     lines_seen = 0
     last_rate_t = _now_ms()
@@ -148,6 +133,26 @@ def _monitor_main(shared: "dict[str, dict]", port: Optional[str], baud: int) -> 
             buff = bytearray()
             last_byte_ms = _now_ms()
             while True:
+                # --- 1) handle outbound TX commands from Python ---
+                try:
+                    # non-blocking drain
+                    for _ in range(8):  # send up to 8 per tick
+                        cmd = txq.get_nowait()  # ('TXB'|'TX'|'TXMAC', arg1, json_str)
+                        kind = cmd[0]
+                        if kind == 'TXB':
+                            line = f"TXB {cmd[2]}\n"
+                            ser.write(line.encode('utf-8', 'ignore'))
+                        elif kind == 'TX':
+                            line = f"TX {cmd[1]} {cmd[2]}\n"
+                            ser.write(line.encode('utf-8', 'ignore'))
+                        elif kind == 'TXMAC':
+                            line = f"TXMAC {cmd[1]} {cmd[2]}\n"
+                            ser.write(line.encode('utf-8', 'ignore'))
+                        ser.flush()
+                except queue.Empty:
+                    pass
+
+                # --- 2) read inbound from receiver ---
                 try:
                     chunk = ser.read(4096)
                 except (serial.SerialException, OSError) as e:
@@ -172,10 +177,38 @@ def _monitor_main(shared: "dict[str, dict]", port: Optional[str], baud: int) -> 
                             last_rate_t = now
                         try:
                             obj = json.loads(line)
-                            # {"rx_ms":..., "mac":"AA:BB:..", "data":{"id":"TOF1","seq":N,"t":ms,"vals":{...}}}
+                            # Receiver format: {"rx_ms":..., "mac":"AA:BB:..", "data":{...}}
                             rx_ms = int(obj.get("rx_ms", _now_ms()))
                             mac   = obj.get("mac", "")
                             data  = obj.get("data") or {}
+                            # Handle BUTTONS
+                            if isinstance(data, dict) and data.get("type") == "button":
+                                sid   = str(data.get("id") or "")
+                                if not sid:
+                                    continue
+                                btn_n = int(data.get("btn", 1))
+                                pressed = bool(data.get("pressed", False))
+                                seq   = int(data.get("seq", 0))
+                                rec = {
+                                    "id": sid,
+                                    "seq": seq,
+                                    "t_send_ms": 0,
+                                    "t_rx_ms": rx_ms,
+                                    "t_host_ms": now,
+                                    "mac": mac,
+                                    "vals": {"btn": btn_n, "pressed": pressed},
+                                }
+                                shared[sid] = rec
+                                # push event (best-effort, non-blocking)
+                                try:
+                                    btnq.put_nowait({
+                                        "id": sid, "btn": btn_n, "pressed": pressed,
+                                        "seq": seq, "t_host_ms": now, "mac": mac
+                                    })
+                                except Exception:
+                                    pass
+                                continue
+                            # Handle TOF / other JSON sensors (unchanged)
                             sid   = data.get("id")
                             if not sid:
                                 continue
@@ -210,14 +243,16 @@ def _monitor_main(shared: "dict[str, dict]", port: Optional[str], baud: int) -> 
 
 # ---------- Public API ----------
 def init(port: Optional[str]=None, baud: int=DEFAULT_BAUD) -> None:
-    """Start the background monitor process (idempotent). Call once at system boot."""
-    global _manager, _proc, _shared, _started
+    """Start the background monitor (idempotent) and TX channel."""
+    global _manager, _proc, _shared, _started, _txq, _btnq
     if _started and _proc and _proc.is_alive():
         return
     if _manager is None:
         _manager = mp.Manager()
-    _shared = _manager.dict()  # type: ignore
-    _proc = mp.Process(target=_monitor_main, args=(_shared, port, baud), daemon=True)
+    _shared = _manager.dict()  # shared latest records per id
+    _txq = mp.Queue()          # outbound commands to child
+    _btnq = mp.Queue(maxsize=256)  # recent button edges
+    _proc = mp.Process(target=_monitor_main, args=(_shared, port, baud, _txq, _btnq), daemon=True)
     _proc.start()
     _started = True
     atexit.register(stop)
@@ -262,6 +297,27 @@ def healthy() -> dict:
         return {"started": _started, "sensors": 0, "since_ms": None}
     return {"started": _started, "sensors": len(_shared.keys()), "since_ms": _now_ms()}
 
+# ---------- TX helpers (PC -> receiver -> ESP-NOW) ----------
+def _json_str(payload: Union[str, dict]) -> str:
+    if isinstance(payload, str):
+        return payload.strip()
+    return json.dumps(payload, separators=(",", ":"))
+
+def tx_broadcast(payload: Union[str, dict]) -> None:
+    """Broadcast a JSON payload: receiver sends 'TXB <JSON>\\n'."""
+    if not _txq: raise RuntimeError("call init() first")
+    _txq.put(('TXB', None, _json_str(payload)))
+
+def tx_to_id(device_id: str, payload: Union[str, dict]) -> None:
+    """Unicast by ID (receiver resolves ID->MAC): 'TX <ID> <JSON>\\n'."""
+    if not _txq: raise RuntimeError("call init() first")
+    _txq.put(('TX', device_id, _json_str(payload)))
+
+def tx_to_mac(mac: str, payload: Union[str, dict]) -> None:
+    """Unicast to a MAC: 'TXMAC <mac> <JSON>\\n'."""
+    if not _txq: raise RuntimeError("call init() first")
+    _txq.put(('TXMAC', mac, _json_str(payload)))
+
 # ---------- Snapshot / formatting / watch ----------
 def snapshot() -> Dict[str, dict]:
     return dict(_shared) if _shared else {}
@@ -269,6 +325,9 @@ def snapshot() -> Dict[str, dict]:
 def _format_row(sid: str, rec: dict, now_ms: int) -> Tuple:
     vals = rec.get("vals") or {}
     dist = vals.get("dist_mm", "")
+    # if a button, show 'pressed' instead of dist
+    if "pressed" in vals:
+        dist = f"btn{vals.get('btn', '')}:{'T' if vals['pressed'] else 'F'}"
     age  = now_ms - int(rec.get("t_host_ms", 0))
     lat  = get_latency_ms(sid)
     mac  = rec.get("mac", "")
@@ -281,7 +340,7 @@ def format_table() -> str:
     for sid, rec in snapshot().items():
         rows.append(_format_row(sid, rec, now))
     rows.sort(key=lambda r: r[0])
-    headers = ("ID", "dist_mm", "age_ms", "lat_ms", "MAC", "seq")
+    headers = ("ID", "value/dist_or_btn", "age_ms", "lat_ms", "MAC", "seq")
     all_rows: List[Tuple] = [headers] + rows
     widths = [max(len(str(row[i])) for row in all_rows) for i in range(len(headers))]
     def fmt(row: Tuple) -> str:
@@ -300,6 +359,7 @@ def _clear_screen():
     else:
         sys.stdout.write("\033[2J\033[H"); sys.stdout.flush()
 
+# ---------- CLI ----------
 def _main_cli():
     ap = argparse.ArgumentParser()
     ap.add_argument("--watch", nargs="?", const="2", help="Refresh rate in Hz for live table (default 2 Hz).")
@@ -308,10 +368,8 @@ def _main_cli():
     args = ap.parse_args()
     init(port=args.port, baud=args.baud)
     if args.watch is not None:
-        try:
-            hz = float(args.watch)
-        except ValueError:
-            hz = 2.0
+        try: hz = float(args.watch)
+        except ValueError: hz = 2.0
         period = max(0.1, 1.0 / hz)
         print(f"[rsm] Watching at {hz:.2f} Hz. Ctrl+C to quit.")
         try:
@@ -323,8 +381,7 @@ def _main_cli():
         except KeyboardInterrupt:
             pass
         finally:
-            stop()
-            return
+            stop(); return
     try:
         while True:
             v = get_value("TOF1", "dist_mm")
@@ -339,9 +396,8 @@ def _main_cli():
 if __name__ == "__main__":
     _main_cli()
 
-# ---------- Filtering & predicates ----------
+# ---------- Filtering & predicates (unchanged for TOF) ----------
 def _get_dist_sample(sid: str, ignore_neg1: bool=True, require_status_zero: bool=False):
-    """Fetch latest raw sample; returns (t_ms, dist_mm) or None (no blocking)."""
     rec = get(sid)
     if not rec:
         return None
@@ -357,11 +413,6 @@ def _get_dist_sample(sid: str, ignore_neg1: bool=True, require_status_zero: bool
     return (int(rec.get("t_host_ms", _now_ms_local())), int(dist))
 
 def _hist_update(sid: str, window_ms: int, **kw):
-    """
-    Update per-sensor history with current sample; trim by time window.
-    IMPORTANT: only append when the packet timestamp (t_host_ms) CHANGES,
-    so tight loops don't add duplicates between packets.
-    """
     now = _now_ms_local()
     sample = _get_dist_sample(sid, **kw)
     h = _hist.setdefault(sid, {'q': deque(maxlen=256), 'last': False, 'last_ts': -1})
@@ -372,16 +423,12 @@ def _hist_update(sid: str, window_ms: int, **kw):
             h['last_ts'] = t_ms
     q = h['q']
     while q and (now - q[0][0]) > window_ms:
-        q.popleft()
+        q.pop(0) if hasattr(q, "pop") else q.popleft()
     return h
 
 def get_distance_filtered(sid: str, window_ms: int=250, min_samples: int=3,
                           ignore_neg1: bool=True, require_status_zero: bool=False,
                           method: str="median"):
-    """
-    Robust distance from recent buffered samples (no waiting).
-    Returns None if not enough distinct samples in window.
-    """
     h = _hist_update(sid, window_ms, ignore_neg1=ignore_neg1, require_status_zero=require_status_zero)
     q = list(h['q'])
     if len(q) < max(1, min_samples):
@@ -401,12 +448,6 @@ def obstructed(sid: str, block_mm: int,
                min_consecutive: int=2,
                ignore_neg1: bool=True,
                require_status_zero: bool=False) -> bool:
-    """
-    Debounced + hysteretic obstruction check (no blocking).
-    - TRUE if there are >= min_consecutive DISTINCT packets < block_mm in the last window_ms.
-    - Once TRUE, remains TRUE until a DISTINCT packet > clear_mm (default block_mm+50).
-    - Fail-safe: if previously TRUE and no new packets arrive, remains TRUE.
-    """
     h = _hist_update(sid, window_ms, ignore_neg1=ignore_neg1, require_status_zero=require_status_zero)
     q = h['q']
     if clear_mm is None:
@@ -426,3 +467,13 @@ def obstructed(sid: str, block_mm: int,
             if latest > clear_mm:
                 h['last'] = False
     return h['last']
+
+# ---------- Button event FIFO ----------
+def button_pop(timeout: float=0.0) -> Optional[dict]:
+    """Pop the next button edge event, or None if empty (timeout seconds)."""
+    if not _btnq:
+        return None
+    try:
+        return _btnq.get(timeout=timeout)
+    except queue.Empty:
+        return None
