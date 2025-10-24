@@ -234,9 +234,11 @@ def testEvent():
         intensity_max=70, 
         flicker_length_min=0.1, 
         flicker_length_max=0.5
-    )'''
+    )
 
-    dimmer(4, 35)  # Treasure room lights (remove later)
+    t.sleep(10)'''
+
+    '''dimmer(4, 35)  # Treasure room lights (remove later)
     t.sleep(2)
     dimmer(2, 100)  # Fire lights
     t.sleep(2)
@@ -265,7 +267,7 @@ def testEvent():
         dimmer(4, 67)  # Treasure room lights (remove later)
         t.sleep(2)
 
-    return
+    return'''
 
 
     for i in range(5):
