@@ -381,7 +381,7 @@ def _main_cli():
         except KeyboardInterrupt:
             pass
         finally:
-            stop(); return
+            stop()
     try:
         while True:
             v = get_value("TOF1", "dist_mm")

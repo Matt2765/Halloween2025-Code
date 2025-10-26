@@ -39,7 +39,7 @@ def fire_cannon(cannon_id:int):
     light_pin = cannon_light_pins[cannon_id]
     smoke_pin = cannon_smoke_pins[cannon_id]
 
-    log_event(f"DEBUG: solenoid:{solenoid_pin}, light:{light_pin}, smoke:{smoke_pin}")
+    #log_event(f"DEBUG: solenoid:{solenoid_pin}, light:{light_pin}, smoke:{smoke_pin}")
 
     log_event(f"[cannons] Firing cannon {cannon_id}")
 
@@ -47,10 +47,10 @@ def fire_cannon(cannon_id:int):
     m1Digital_Write(smoke_pin, 0)
     log_event(f"[cannons] Activated smoke for cannon {cannon_id}")
 
-    t.sleep(.5)  # Brief delay before firing
+    t.sleep(.1)  # Brief delay before firing
 
     audio = random.choice(audioFiles)
-    play_audio("graveyard", audio, gain=1)
+    play_audio(audio, gain=1)
 
     # Activate light
     m1Digital_Write(light_pin, 0)
@@ -62,13 +62,13 @@ def fire_cannon(cannon_id:int):
     m1Digital_Write(solenoid_pin, 0)
     log_event(f"[cannons] Activated solenoid for cannon {cannon_id}")
 
-    t.sleep(1.9)
+    t.sleep(1)
 
     # Deactivate smoke
     m1Digital_Write(smoke_pin, 1)
     log_event(f"[cannons] Deactivated smoke for cannon {cannon_id}")
     
-    t.sleep(.5)
+    t.sleep(.8)
 
     # Deactivate light
     m1Digital_Write(light_pin, 1)

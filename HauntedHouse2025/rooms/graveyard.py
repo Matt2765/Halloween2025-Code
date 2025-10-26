@@ -7,6 +7,7 @@ import random
 import threading
 from control.dimmer_controller import dimmer, dimmer_flicker
 from control.arduino import m1Digital_Write
+from control import cannons
 
 Scripted_Event = False
 
@@ -16,7 +17,9 @@ def run():
     while house.HouseActive or house.Demo:
         log_event("[Graveyard] Running loop...")
 
-        testEvent()
+        #testEvent()
+
+        idleEvent()
 
         #MedallionCallsEvent()
         for i in range(3):
@@ -37,6 +40,21 @@ def run():
 
     log_event("[Graveyard] Exiting.")
     
+def idleEvent():
+    while house.HouseActive or house.Demo:
+        cannons.fire_cannon(1)
+
+        for i in range(random.randint(3, 10)):
+            t.sleep(1)
+            if BreakCheck():
+                return
+
+        cannons.fire_cannon(2)
+
+        for i in range(random.randint(30, 60)):
+            t.sleep(1)
+            if BreakCheck():
+                return
 
 def BeckettsDeathEvent():
     global Scripted_Event 
@@ -209,8 +227,8 @@ def testEvent():
 
     t.sleep(1)
 
-    '''dimmer_flicker(     # ambient lights flicker
-        channel=4,
+    dimmer_flicker(     # ambient lights flicker
+        channel=1,
         duration_s=10, 
         intensity_min=45, 
         intensity_max=70, 
@@ -227,18 +245,18 @@ def testEvent():
         flicker_length_max=0.5
     )
 
-    dimmer_flicker(     # ambient lights flicker
-        channel=7,
+    '''dimmer_flicker(     # ambient lights flicker
+        channel=2,
         duration_s=10, 
         intensity_min=45, 
         intensity_max=70, 
         flicker_length_min=0.1, 
         flicker_length_max=0.5
-    )
+    )'''
 
-    t.sleep(10)'''
+    #t.sleep(10)
 
-    '''dimmer(4, 35)  # Treasure room lights (remove later)
+    '''dimmer(1, 35)  # Treasure room lights (remove later)
     t.sleep(2)
     dimmer(2, 100)  # Fire lights
     t.sleep(2)
@@ -246,9 +264,9 @@ def testEvent():
     #m1Digital_Write(29, 0)  # Deck lightning
     dimmer(7, 100)  # Ambient lights
     t.sleep(2)
-    dimmer(4, 100)  # Treasure room lights (remove later)
+    dimmer(1, 100)  # Treasure room lights (remove later)
     t.sleep(2)
-    dimmer(4, 50)  # Treasure room lights (remove later)
+    dimmer(1, 50)  # Treasure room lights (remove later)
 
     t.sleep(2)
     dimmer(2, 75)  # Fire lights
@@ -258,16 +276,16 @@ def testEvent():
     dimmer(7, 50)  # Ambient lights
     t.sleep(2)
     while True:
-        dimmer(4, 100)  # Treasure room lights (remove later)
+        dimmer(1, 100)  # Treasure room lights (remove later)
         t.sleep(2)
-        dimmer(4, 75)  # Treasure room lights (remove later)
+        dimmer(1, 75)  # Treasure room lights (remove later)
         t.sleep(2)
-        dimmer(4, 70)  # Treasure room lights (remove later)
+        dimmer(1, 70)  # Treasure room lights (remove later)
         t.sleep(2)
-        dimmer(4, 67)  # Treasure room lights (remove later)
-        t.sleep(2)
+        dimmer(1, 67)  # Treasure room lights (remove later)
+        t.sleep(2)'''
 
-    return'''
+    return
 
 
     for i in range(5):

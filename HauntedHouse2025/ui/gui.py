@@ -1,6 +1,7 @@
 # ui/gui.py
 import tkinter as tk
 import threading
+from rooms import quarterdeck
 from rooms import cargoHold, gangway, treasureRoom
 from context import house
 from control.shutdown import shutdown
@@ -14,13 +15,13 @@ def demoEvent(room):
     toggleHouseLights(False)
     log_event(f"[GUI] Starting demo of {room}")
 
-    from rooms import swamp, graveyard
+    from rooms import graveyard
     if room == 'GW':
         threading.Thread(target=gangway.run, args=()).start()
     elif room == 'TR':
         threading.Thread(target=treasureRoom.run, args=()).start()
     elif room == 'SR':
-        threading.Thread(target=swamp.run, args=()).start()
+        threading.Thread(target=quarterdeck.run, args=()).start()
     elif room == 'MkR':
         threading.Thread(target=cargoHold.run, args=()).start()
     elif room == 'GY':
@@ -55,8 +56,8 @@ def MainGUI():
     tk.Button(root, text="Open Door 3", height=2, width=15, command=lambda: setDoorState(3, "OPEN")).place(x=25, y=335)
     tk.Button(root, text="Close Door 3", height=2, width=15, command=lambda: setDoorState(3, "CLOSED")).place(x=150, y=335)
 
-    tk.Button(root, text="Demo gangway", height=2, width=15, command=lambda: demoEvent('GW')).place(x=150, y=430)
-    tk.Button(root, text="Demo Swamp Room", height=2, width=15, command=lambda: demoEvent('SR')).place(x=25, y=430)
+    tk.Button(root, text="Demo Gangway", height=2, width=15, command=lambda: demoEvent('GW')).place(x=150, y=430)
+    tk.Button(root, text="Demo Quarterdeck", height=2, width=15, command=lambda: demoEvent('SR')).place(x=25, y=430)
     tk.Button(root, text="Demo Graveyard", height=2, width=15, command=lambda: demoEvent('GY')).place(x=275, y=430)
     tk.Button(root, text="Demo Treasure Room", height=2, width=15, command=lambda: demoEvent("TR")).place(x=25, y=480)
     tk.Button(root, text="Demo Cargo Hold", height=2, width=15, command=lambda: demoEvent("MkR")).place(x=150, y=480)

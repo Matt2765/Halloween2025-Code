@@ -43,7 +43,7 @@ class HalloweenHTTP(BaseHTTPRequestHandler):
         #     demoEvent("TR")
         # elif message == "/DemotreasureRoom":
         #     demoEvent("TR")
-        # elif message == "/DemoSwampRoom":
+        # elif message == "/DemoQuarterdeck":
         #     demoEvent("SR")
         # elif message == "/DemocargoHold":
         #     demoEvent("MkR")

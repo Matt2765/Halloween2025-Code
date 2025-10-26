@@ -3,6 +3,7 @@ import time as t
 import threading
 import multiprocessing
 
+from rooms import quarterdeck
 from rooms import cargoHold, gangway, treasureRoom
 from context import house
 from control.audio_manager import play_audio
@@ -14,7 +15,7 @@ from control import remote_sensor_monitor
 from ui.gui import MainGUI
 from ui.http_server import HTTP_SERVER
 from utils.tools import log_event, BreakCheck
-from rooms import swamp, graveyard
+from rooms import graveyard
 from control.doors import spawn_doors
 import control.dimmer_controller as dim
 from control.shutdown import shutdown
@@ -26,6 +27,7 @@ def initialize_system():
 
             # Initialize hardware
             connectArduino()
+            dim.init(port="COM7", baud=115200, timeout_s=8.0, debug=True)
             
             t.sleep(1)
 
@@ -35,10 +37,7 @@ def initialize_system():
             threading.Thread(target=HTTP_SERVER, daemon=True).start()
             threading.Thread(target=MainGUI, daemon=True).start()
             
-            #remote_sensor_monitor.init(port=None, baud=921600)
-            dim.start()
-            if not dim.wait_ready(5):
-               raise RuntimeError("Dimmer not connected")
+            #remote_sensor_monitor.init(port="COM6", baud=921600)
 
             house.Boot = False
             
@@ -98,10 +97,10 @@ def StartHouse():
         ).start()
         
         threading.Thread(
-            target=swamp.run, 
+            target=quarterdeck.run, 
             args=(), 
             daemon=True, 
-            name="swampRoom"
+            name="quarterdeck"
         ).start()
         
         threading.Thread(
