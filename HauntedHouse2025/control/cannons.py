@@ -3,6 +3,7 @@ import time as t
 from utils.tools import log_event
 from control.audio_manager import play_audio
 import random
+import threading
 
 cannon_solenoid_pins = {
     1: 39,
@@ -30,51 +31,54 @@ audioFiles = [
     ]
 
 def fire_cannon(cannon_id:int):
-    """Fires the specified cannon by activating its solenoid, light, and smoke effects."""
-    if cannon_id not in cannon_solenoid_pins:
-        log_event(f"[cannons] Invalid cannon ID: {cannon_id}")
-        return
+    def main():
+        """Fires the specified cannon by activating its solenoid, light, and smoke effects."""
+        if cannon_id not in cannon_solenoid_pins:
+            log_event(f"[cannons] Invalid cannon ID: {cannon_id}")
+            return
 
-    solenoid_pin = cannon_solenoid_pins[cannon_id]
-    light_pin = cannon_light_pins[cannon_id]
-    smoke_pin = cannon_smoke_pins[cannon_id]
+        solenoid_pin = cannon_solenoid_pins[cannon_id]
+        light_pin = cannon_light_pins[cannon_id]
+        smoke_pin = cannon_smoke_pins[cannon_id]
 
-    #log_event(f"DEBUG: solenoid:{solenoid_pin}, light:{light_pin}, smoke:{smoke_pin}")
+        #log_event(f"DEBUG: solenoid:{solenoid_pin}, light:{light_pin}, smoke:{smoke_pin}")
 
-    log_event(f"[cannons] Firing cannon {cannon_id}")
+        log_event(f"[cannons] Firing cannon {cannon_id}")
 
-    # Activate smoke
-    m1Digital_Write(smoke_pin, 0)
-    log_event(f"[cannons] Activated smoke for cannon {cannon_id}")
+        # Activate smoke
+        m1Digital_Write(smoke_pin, 0)
+        log_event(f"[cannons] Activated smoke for cannon {cannon_id}")
 
-    t.sleep(.1)  # Brief delay before firing
+        t.sleep(.1)  # Brief delay before firing
 
-    audio = random.choice(audioFiles)
-    play_audio(audio, gain=1)
+        audio = random.choice(audioFiles)
+        play_audio("graveyard", audio, gain=1)
 
-    # Activate light
-    m1Digital_Write(light_pin, 0)
-    log_event(f"[cannons] Activated light for cannon {cannon_id}")
+        # Activate light
+        m1Digital_Write(light_pin, 0)
+        log_event(f"[cannons] Activated light for cannon {cannon_id}")
 
-    t.sleep(.1)
+        t.sleep(.1)
 
-    # Activate solenoid to fire
-    m1Digital_Write(solenoid_pin, 0)
-    log_event(f"[cannons] Activated solenoid for cannon {cannon_id}")
+        # Activate solenoid to fire
+        m1Digital_Write(solenoid_pin, 0)
+        log_event(f"[cannons] Activated solenoid for cannon {cannon_id}")
 
-    t.sleep(1)
+        t.sleep(1)
 
-    # Deactivate smoke
-    m1Digital_Write(smoke_pin, 1)
-    log_event(f"[cannons] Deactivated smoke for cannon {cannon_id}")
-    
-    t.sleep(.8)
+        # Deactivate smoke
+        m1Digital_Write(smoke_pin, 1)
+        log_event(f"[cannons] Deactivated smoke for cannon {cannon_id}")
+        
+        t.sleep(.8)
 
-    # Deactivate light
-    m1Digital_Write(light_pin, 1)
-    log_event(f"[cannons] Deactivated light for cannon {cannon_id}")
+        # Deactivate light
+        m1Digital_Write(light_pin, 1)
+        log_event(f"[cannons] Deactivated light for cannon {cannon_id}")
 
-    t.sleep(3)
+        t.sleep(3)
 
-    m1Digital_Write(solenoid_pin, 1)
-    log_event(f"[cannons] Deactivated solenoid for cannon {cannon_id}")
+        m1Digital_Write(solenoid_pin, 1)
+        log_event(f"[cannons] Deactivated solenoid for cannon {cannon_id}")
+
+    threading.Thread(target=main, daemon=True).start()

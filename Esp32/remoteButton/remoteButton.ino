@@ -11,7 +11,7 @@
 #define WAKE_ON_LEVEL_LOW  0
 
 // ====== CONFIGURE THESE ======
-const char* DEVICE_ID = "BTN1";     // unique per node
+const char* DEVICE_ID = "BTN4";     // unique per node
 #define ESPNOW_CHANNEL 1                // set to your receiver's ESP-NOW/Wi-Fi channel
 #define SEND_RELEASE_EVENT 1            // 1 = also send "pressed=false" after release; 0 = only send press
 // ============================

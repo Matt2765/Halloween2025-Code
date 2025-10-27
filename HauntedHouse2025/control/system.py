@@ -27,7 +27,7 @@ def initialize_system():
 
             # Initialize hardware
             connectArduino()
-            dim.init(port="COM7", baud=115200, timeout_s=8.0, debug=True)
+            dim.init()
             
             t.sleep(1)
 
@@ -37,7 +37,7 @@ def initialize_system():
             threading.Thread(target=HTTP_SERVER, daemon=True).start()
             threading.Thread(target=MainGUI, daemon=True).start()
             
-            #remote_sensor_monitor.init(port="COM6", baud=921600)
+            remote_sensor_monitor.init(port="COM6", baud=921600)
 
             house.Boot = False
             

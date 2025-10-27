@@ -5,7 +5,7 @@ from control.audio_manager import play_audio
 from utils.tools import BreakCheck, log_event
 import random
 import threading
-from control.dimmer_controller import dimmer, dimmer_flicker
+from control.dimmer_controller import dim, dimmer_flicker
 from control.arduino import m1Digital_Write
 from control import cannons
 
@@ -19,9 +19,9 @@ def run():
 
         #testEvent()
 
-        idleEvent()
+        #idleEvent()
 
-        #MedallionCallsEvent()
+        MedallionCallsEvent()
         for i in range(3):
             t.sleep(1)
             if BreakCheck():
@@ -92,7 +92,7 @@ def MedallionCallsEvent():
     
     log_event("[Graveyard] Medallion Calls Event Starting...")
     
-    play_audio("graveyard", "TheMedallionCalls.wav", gain=.1)
+    play_audio("graveyard", "TheMedallionCalls.wav", gain=.2)
         
     for i in range(17):
         t.sleep(1)
@@ -100,8 +100,15 @@ def MedallionCallsEvent():
             return
             
     threading.Thread(target=randAttackerCannons, daemon=True).start()
+
+    for i in range(1):  # 22
+        t.sleep(1)
+        if BreakCheck():
+            return
+
+    cannons.fire_cannon(3)
         
-    for i in range(3):  # 22
+    for i in range(2):  # 22
         t.sleep(1)
         if BreakCheck():
             return
@@ -115,15 +122,22 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
         
-    play_audio("graveyard", "CannonDesigned_1.wav", gain=1)
+    cannons.fire_cannon(1)
     for i in range(5):  # 33.8
         t.sleep(1)
         if BreakCheck():
             return
-    play_audio("graveyard", "CannonDesigned_4.wav", gain=1)
+    cannons.fire_cannon(2)
+
+    for i in range(4):  # 42
+        t.sleep(1)
+        if BreakCheck():
+            return
+
+    cannons.fire_cannon(3)
     
     t.sleep(.2)
-    for i in range(8):  # 42
+    for i in range(4):  # 42
         t.sleep(1)
         if BreakCheck():
             return
@@ -138,14 +152,21 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
         
-    play_audio("graveyard", "CannonDesigned_2.wav", gain=1)
+    cannons.fire_cannon(1)
     for i in range(6):  # 55
         t.sleep(1)
         if BreakCheck():
             return
-    play_audio("graveyard", "CannonDesigned_3.wav", gain=1)
+    cannons.fire_cannon(2)
     
-    for i in range(5):  # 60
+    for i in range(4):  # 60
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    cannons.fire_cannon(3)
+
+    for i in range(1):  # 60
         t.sleep(1)
         if BreakCheck():
             return
@@ -157,12 +178,12 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
 
-    play_audio("graveyard", "CannonDesigned_4.wav", gain=1)
+    cannons.fire_cannon(2)
     for i in range(4):  # 69
         t.sleep(1)
         if BreakCheck():
             return
-    play_audio("graveyard", "CannonDesigned_1.wav", gain=1)
+    cannons.fire_cannon(1)
     
     for i in range(8):  # 77
         t.sleep(1)
@@ -178,12 +199,12 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
         
-    play_audio("graveyard", "CannonDesigned_2.wav", gain=1)
+    cannons.fire_cannon(1)
     for i in range(4):  # 91
         t.sleep(1)
         if BreakCheck():
             return
-    play_audio("graveyard", "CannonDesigned_4.wav", gain=1)
+    cannons.fire_cannon(2)
         
     for i in range(16):
         t.sleep(1)

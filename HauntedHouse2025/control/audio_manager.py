@@ -7,12 +7,16 @@
 # + Threaded, overlapping playback
 # + Text-to-speech (offline)
 # + Simple unified play_audio() API
+# + Stereo support via "stereo_<name>" mapping:
+#     - Either a single entry with index=[L,R]
+#     - Or two entries: "stereo_<name>_L" and "stereo_<name>_R"
+#   play_audio("<name>", file) will auto-use stereo_<name> if present.
 # -------------------------------------------------------------------
 
 from __future__ import annotations
 import os, threading, tempfile, subprocess, platform
 from pathlib import Path
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Optional, Tuple, List, Union
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
@@ -24,31 +28,39 @@ from utils.tools import log_event
 
 # Set your exact device indexes (use list_output_devices())
 PRIMARY_DEVICE_INDEX: Optional[int] = 3      # HDMI / AVR device
-SECONDARY_DEVICE_INDEX: Optional[int] = 26   # USB 7.1 soundcard
+SECONDARY_DEVICE_INDEX: Optional[int] = 5   # USB 7.1 soundcard
 FALLBACK_TO_SYSTEM_DEFAULT = True            # fallback if stream open fails
 
 # Primary (HDMI) channels
-hdmi_channels: Dict[str, Dict[str, float | int]] = {
-    "graveyard":     {"index": 0, "gain": 1.0},
-    "frontRight":    {"index": 1, "gain": 0.6},
-    "center":        {"index": 2, "gain": 1.4},
-    "subwoofer":     {"index": 3, "gain": 1.4},
-    "swampRoom":     {"index": 4, "gain": 1.6},
-    "atticSpeaker":  {"index": 5, "gain": 1.6},
-    "graveyard1":    {"index": 6, "gain": 1.8},
-    "closetCreak":   {"index": 7, "gain": 1.8},
+# NOTE: index can be int (mono target) or [L, R] (stereo target)
+hdmi_channels: Dict[str, Dict[str, Union[float, int, List[int]]]] = {
+    "treasureRoom": {"index": 0, "gain": 1.0},
+    "quarterdeck":  {"index": 1, "gain": 0.6},
+    "gangway":      {"index": 2, "gain": 1.4},
+    "HDMI_LFE":     {"index": 3, "gain": 1.4},
+    "HDMI_SL":      {"index": 4, "gain": 1.6},
+    "cargoHold":    {"index": 5, "gain": 1.6},
+    "HDMI_BL":      {"index": 6, "gain": 1.8},
+    "HDMI_BR":      {"index": 7, "gain": 1.8},
+    # Example stereo on HDMI (if you want it):
+    # "stereo_front": {"index": [0, 1], "gain": 1.0},
+    # or two entries:
+    # "stereo_front_L": {"index": 0, "gain": 1.0},
+    # "stereo_front_R": {"index": 1, "gain": 1.0},
 }
 
 # Secondary (USB 7.1) channels
-usb7_channels: Dict[str, Dict[str, float | int]] = {
-    "usb_FL": {"index": 0, "gain": 1.0},
-    "usb_FR": {"index": 1, "gain": 1.0},
-    "usb_C":  {"index": 2, "gain": 1.0},
-    "usb_LFE":{"index": 3, "gain": 1.0},
-    "usb_SL": {"index": 4, "gain": 1.0},
-    "usb_SR": {"index": 5, "gain": 1.0},
-    "usb_BL": {"index": 6, "gain": 1.0},
-    "usb_BR": {"index": 7, "gain": 1.0},
+# NOTE: index can be int (mono target) or [L, R] (stereo target)
+usb7_channels: Dict[str, Dict[str, Union[float, int, List[int]]]] = {
+    "stereo_graveyard_L": {"index": 0, "gain": 1.0},
+    "stereo_graveyard_R": {"index": 1, "gain": 1.0},
+
+    "usb_C":   {"index": 2, "gain": 1.0},
+    "usb_LFE": {"index": 3, "gain": 1.0},
+    "usb_SL":  {"index": 4, "gain": 1.0},
+    "usb_SR":  {"index": 5, "gain": 1.0},
+    "usb_BL":  {"index": 6, "gain": 1.0},
+    "usb_BR":  {"index": 7, "gain": 1.0},
 }
 
 # ==========================================================
@@ -106,19 +118,34 @@ def _resolve_sound_path(wav_or_path: str, base_folder: Optional[Path] = None) ->
     base = Path(base_folder) if base_folder else DEFAULT_SOUND_DIR
     return (base / p).resolve()
 
-def _read_audio_mono(file_path: Path) -> tuple[np.ndarray, int]:
+def _read_audio(file_path: Path) -> tuple[np.ndarray, int]:
+    """
+    Returns (audio, fs) where audio is float32 shape (N, C) with C in {1,2}
+    If file has >2 channels, it averages to stereo (2ch). If 2ch+, keeps stereo.
+    """
     data, fs = sf.read(str(file_path), dtype="float32", always_2d=True)
-    mono = data[:, 0] if data.shape[1] == 1 else data.mean(axis=1)
-    return mono.astype("float32"), int(fs)
+    ch = data.shape[1]
+    if ch == 1:
+        return data.astype("float32"), int(fs)
+    if ch == 2:
+        return data[:, :2].astype("float32"), int(fs)
+    # Downmix >2 to stereo by averaging L group / R group evenly
+    # Simple approach: average all channels to stereo equally
+    mean_mono = data.mean(axis=1, keepdims=True)
+    stereo = np.repeat(mean_mono, 2, axis=1)
+    return stereo.astype("float32"), int(fs)
 
 def _ensure_samplerate(x: np.ndarray, src_fs: int, dst_fs: int) -> tuple[np.ndarray, int]:
     if src_fs == dst_fs:
         return x, src_fs
-    n_src = len(x)
+    n_src = x.shape[0]
     n_dst = int(round(n_src * (dst_fs / src_fs)))
     t_src = np.linspace(0.0, 1.0, n_src, endpoint=False)
     t_dst = np.linspace(0.0, 1.0, n_dst, endpoint=False)
-    return np.interp(t_dst, t_src, x).astype("float32"), dst_fs
+    out = np.empty((n_dst, x.shape[1]), dtype="float32")
+    for c in range(x.shape[1]):
+        out[:, c] = np.interp(t_dst, t_src, x[:, c])
+    return out, dst_fs
 
 def _pack_device(idx: int) -> Tuple[int, int, int, str, str]:
     d = sd.query_devices()[idx]
@@ -145,20 +172,105 @@ def _get_fixed_device(which: str) -> Tuple[int, int, int, str, str]:
         return _pack_device(SECONDARY_DEVICE_INDEX)
     raise ValueError("which must be 'primary' or 'secondary'")
 
-def _resolve_named_target(name: str) -> Tuple[str, int, float]:
-    if name in hdmi_channels and name in usb7_channels:
-        raise ValueError(f"Name '{name}' exists in both tables.")
-    if name in hdmi_channels:
-        v = hdmi_channels[name]; return "primary", int(v["index"]), float(v["gain"])
-    if name in usb7_channels:
-        v = usb7_channels[name]; return "secondary", int(v["index"]), float(v["gain"])
+# ---------- Stereo resolver helpers ----------
+
+def _maybe_pair_from_entry(name: str, tbl: Dict[str, Dict[str, Union[float, int, List[int]]]]) -> Optional[List[int]]:
+    """
+    Find a stereo pair for a given base name by looking for:
+      - key "stereo_<name>" with index=[L,R], OR
+      - keys "stereo_<name>_L" and "stereo_<name>_R" with int indices.
+    Returns [L, R] or None.
+    """
+    base = f"stereo_{name}"
+    # Single entry with list/tuple
+    if base in tbl:
+        idx = tbl[base].get("index")
+        if isinstance(idx, (list, tuple)) and len(idx) == 2:
+            return [int(idx[0]), int(idx[1])]
+    # _L / _R form
+    l_key, r_key = f"{base}_L", f"{base}_R"
+    if l_key in tbl and r_key in tbl:
+        l_idx = tbl[l_key].get("index")
+        r_idx = tbl[r_key].get("index")
+        if isinstance(l_idx, int) and isinstance(r_idx, int):
+            return [l_idx, r_idx]
+    return None
+
+def _lookup_in_tables(name: str) -> Tuple[str, Dict[str, Dict[str, Union[float, int, List[int]]]]]:
+    if name in hdmi_channels or f"stereo_{name}" in hdmi_channels or f"stereo_{name}_L" in hdmi_channels:
+        return "primary", hdmi_channels
+    if name in usb7_channels or f"stereo_{name}" in usb7_channels or f"stereo_{name}_L" in usb7_channels:
+        return "secondary", usb7_channels
+    # If not explicitly in either, prefer primary then secondary for stereo hints
+    return "primary", hdmi_channels
+
+def _resolve_named_target(name: str) -> Tuple[str, str, Union[int, List[int]], float]:
+    """
+    Returns (device_kind, mode, index_or_pair, gain)
+      - device_kind: "primary" | "secondary"
+      - mode: "one" | "stereo"
+      - index_or_pair: int for mono, [L,R] for stereo
+      - gain: float
+    """
+    # Decide which table this name belongs to (or should try)
+    dev_kind, tbl = _lookup_in_tables(name)
+
+    # 1) If a stereo mapping exists (preferred)
+    pair = _maybe_pair_from_entry(name, tbl)
+    if pair is not None:
+        # Choose gain from the base stereo entry or fall back to 1.0
+        base = f"stereo_{name}"
+        if base in tbl and isinstance(tbl[base].get("gain", 1.0), (int, float)):
+            gain = float(tbl[base]["gain"])
+        else:
+            # Else average _L and _R gains if present, else 1.0
+            l_key, r_key = f"{base}_L", f"{base}_R"
+            gains = []
+            for k in (l_key, r_key):
+                if k in tbl and isinstance(tbl[k].get("gain", 1.0), (int, float)):
+                    gains.append(float(tbl[k]["gain"]))
+            gain = sum(gains)/len(gains) if gains else 1.0
+        return dev_kind, "stereo", [int(pair[0]), int(pair[1])], gain
+
+    # 2) Otherwise, look for a mono mapping
+    if name in tbl:
+        v = tbl[name]
+        idx = v.get("index")
+        gain = float(v.get("gain", 1.0))
+        # If user accidentally set a list here, treat it as stereo too
+        if isinstance(idx, (list, tuple)) and len(idx) == 2:
+            return dev_kind, "stereo", [int(idx[0]), int(idx[1])], gain
+        return dev_kind, "one", int(idx), gain
+
+    # If not found in selected table, try the other one explicitly
+    other_kind, other_tbl = ("secondary", usb7_channels) if dev_kind == "primary" else ("primary", hdmi_channels)
+    pair = _maybe_pair_from_entry(name, other_tbl)
+    if pair is not None:
+        base = f"stereo_{name}"
+        if base in other_tbl and isinstance(other_tbl[base].get("gain", 1.0), (int, float)):
+            gain = float(other_tbl[base]["gain"])
+        else:
+            l_key, r_key = f"{base}_L", f"{base}_R"
+            gains = []
+            for k in (l_key, r_key):
+                if k in other_tbl and isinstance(other_tbl[k].get("gain", 1.0), (int, float)):
+                    gains.append(float(other_tbl[k]["gain"]))
+            gain = sum(gains)/len(gains) if gains else 1.0
+        return other_kind, "stereo", [int(pair[0]), int(pair[1])], gain
+
+    if name in other_tbl:
+        v = other_tbl[name]
+        idx = v.get("index")
+        gain = float(v.get("gain", 1.0))
+        if isinstance(idx, (list, tuple)) and len(idx) == 2:
+            return other_kind, "stereo", [int(idx[0]), int(idx[1])], gain
+        return other_kind, "one", int(idx), gain
+
     raise ValueError(f"Unknown channel name '{name}'.")
 
 # ==========================================================
 # === STREAM OPEN / PLAY ==================================
 # ==========================================================
-
-# --- replace ONLY this helper + function in control/audio_manager.py ---
 
 def _device_hostapi_name(idx: int) -> str:
     try:
@@ -201,31 +313,25 @@ def _open_stream_robust(fs: int, have_channels: int, device_index: int, device_n
             extra_settings=ex
         )
 
-    # WASAPI path only if this index belongs to the WASAPI host API
     if "wasapi" in hostapi and have_channels >= MULTICH_MIN_CHANNELS:
-        # 1) WASAPI exclusive at requested fs
         try:
             ex = _mk_wasapi(True)
             if ex:
                 return _try(device_index, ex, fs, "WASAPI exclusive"), fs
         except Exception as e:
             log_event(f"[Audio] Fail WASAPI exclusive: {e}")
-
-        # 2) WASAPI shared at requested fs
         try:
             ex = _mk_wasapi(False)
             return _try(device_index, ex, fs, "WASAPI shared"), fs
         except Exception as e:
             log_event(f"[Audio] Fail WASAPI shared: {e}")
 
-    # Non-WASAPI (e.g., MME/DirectSound) → open at the device's default fs with no extra settings
     try:
         dev_default_fs = int(round(float(sd.query_devices()[device_index].get("default_samplerate", fs))))
         return _try(device_index, None, dev_default_fs, "generic shared (hostapi!=WASAPI)"), dev_default_fs
     except Exception as e:
         log_event(f"[Audio] Fail generic shared on hostapi '{hostapi}': {e}")
 
-    # Optional fallback to system default output
     if FALLBACK_TO_SYSTEM_DEFAULT:
         try:
             _, def_out = sd.default.device  # (input, output)
@@ -236,12 +342,16 @@ def _open_stream_robust(fs: int, have_channels: int, device_index: int, device_n
             log_event(f"[Audio] System default fallback failed: {e}")
 
     raise RuntimeError("Failed to open audio stream: all strategies exhausted.")
-# --- end replace ---
 
-def _play_mono_nonblocking(mono: np.ndarray, fs: int, dev_idx: int, dev_name: str,
-                           have_channels: int, mode: str, ch_index: int | None,
-                           gain: float, label: str):
-    """Non-blocking threaded stream."""
+def _play_pcm_nonblocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
+                          have_channels: int, mode: str,
+                          idx_or_pair: Union[int, List[int]],
+                          gain: float, label: str):
+    """
+    pcm: float32 (N, Csrc), Csrc in {1,2}
+    mode: "one" (mono target) or "stereo" (two indices target)
+    idx_or_pair: int for mono channel index, [L,R] for stereo indices
+    """
     epoch = _next_epoch()
     session = _Session(epoch, label)
 
@@ -249,7 +359,7 @@ def _play_mono_nonblocking(mono: np.ndarray, fs: int, dev_idx: int, dev_name: st
         stream = None
         try:
             stream, used_fs = _open_stream_robust(fs, have_channels, dev_idx, dev_name)
-            mono_res, _ = _ensure_samplerate(mono, fs, used_fs)
+            pcm_res, _ = _ensure_samplerate(pcm, fs, used_fs)
             with stream:
                 with _active_lock:
                     _active_streams.append(stream)
@@ -257,22 +367,41 @@ def _play_mono_nonblocking(mono: np.ndarray, fs: int, dev_idx: int, dev_name: st
                 blocksize = stream.blocksize or max(512, used_fs // 25)
                 zero_blk = np.zeros((blocksize, have_channels), np.float32)
                 stream.write(zero_blk)
-                n = mono_res.shape[0]; pos = 0
+                n = pcm_res.shape[0]; pos = 0
+                src_ch = pcm_res.shape[1]
                 while pos < n:
                     if epoch <= _cutoff_epoch or _stop_event.is_set(): break
                     end = min(pos + blocksize, n)
-                    block = mono_res[pos:end] * gain
+                    block = pcm_res[pos:end] * gain  # (B, Csrc)
+
+                    # Build output frame (B, have_channels)
                     if have_channels <= 1:
-                        out = block[:, None]
+                        # Collapse to mono device
+                        out = block[:, :1] if src_ch == 1 else block[:, :1]  # L only
                     elif have_channels == 2:
-                        out = np.column_stack((block, block))
-                    else:
-                        if mode == "all":
-                            out = np.repeat(block[:, None], have_channels, axis=1)
+                        if mode == "stereo":
+                            # Direct to L/R
+                            if src_ch == 1:
+                                out = np.column_stack((block[:, 0], block[:, 0]))
+                            else:
+                                out = block[:, :2]
                         else:
-                            idx = min(int(ch_index or 0), have_channels - 1)
-                            out = np.zeros((block.shape[0], have_channels), np.float32)
-                            out[:, idx] = block
+                            # mono target -> duplicate to both
+                            out = np.column_stack((block[:, 0], block[:, 0]))
+                    else:
+                        out = np.zeros((block.shape[0], have_channels), np.float32)
+                        if mode == "stereo":
+                            L, R = int(idx_or_pair[0]), int(idx_or_pair[1])
+                            if src_ch == 1:
+                                out[:, L] = block[:, 0]
+                                out[:, R] = block[:, 0]
+                            else:
+                                out[:, L] = block[:, 0]
+                                out[:, R] = block[:, 1]
+                        else:
+                            idx = min(int(idx_or_pair), have_channels - 1)
+                            out[:, idx] = block[:, 0]
+
                     stream.write(out)
                     pos = end
         finally:
@@ -287,21 +416,34 @@ def _play_mono_nonblocking(mono: np.ndarray, fs: int, dev_idx: int, dev_name: st
 # === PUBLIC PLAYBACK API =================================
 # ==========================================================
 
-def play_to_named_channel(wav_file: str, target_name: str, *,
+def play_to_named_channel(wav_file: str, target_name: str, * ,
                           gain_override: float | None = None,
                           base_folder: Path | str | None = None):
     base_path = Path(base_folder) if base_folder else DEFAULT_SOUND_DIR
     file_path = _resolve_sound_path(wav_file, base_folder=base_path)
     if not file_path.exists():
         raise FileNotFoundError(file_path)
-    kind, ch_index, default_gain = _resolve_named_target(target_name)
+
+    dev_kind, mode, idx_or_pair, default_gain = _resolve_named_target(target_name)
     gain = gain_override if gain_override is not None else default_gain
-    mono, src_fs = _read_audio_mono(file_path)
-    mono, out_fs = _ensure_samplerate(mono, src_fs, 48000)
-    dev = _get_fixed_device(kind)
-    ch = min(ch_index, dev[1] - 1)
-    log_event(f"[Audio] Playing '{file_path.name}' on {kind.upper()} ch={ch}, gain={gain}")
-    _play_mono_nonblocking(mono, out_fs, dev[0], dev[4], dev[1], "one", ch, gain, f"{file_path.name}@{target_name}")
+
+    pcm, src_fs = _read_audio(file_path)
+    pcm, out_fs = _ensure_samplerate(pcm, src_fs, 48000)
+
+    dev = _get_fixed_device(dev_kind)
+    # Clamp indices to device channel count if needed
+    if mode == "one":
+        ch = min(int(idx_or_pair), dev[1] - 1)
+        idx_or_pair = ch
+        extra = f"ch={ch}"
+    else:
+        L = min(int(idx_or_pair[0]), dev[1] - 1)
+        R = min(int(idx_or_pair[1]), dev[1] - 1)
+        idx_or_pair = [L, R]
+        extra = f"L={L},R={R}"
+
+    log_event(f"[Audio] Playing '{file_path.name}' on {dev_kind.upper()} {mode} ({extra}), gain={gain}")
+    _play_pcm_nonblocking(pcm, out_fs, dev[0], dev[4], dev[1], mode, idx_or_pair, gain, f"{file_path.name}@{target_name}")
 
 def play_to_all_channels(wav_or_text: str, *, tts_rate: int = 0,
                          gain_override: float | None = None,
@@ -320,11 +462,13 @@ def play_to_all_channels(wav_or_text: str, *, tts_rate: int = 0,
             tmp_path = Path(tmp)
             text_to_wav(wav_or_text, tmp_path, tts_rate)
             file_path = tmp_path
-        mono, src_fs = _read_audio_mono(file_path)
-        mono, out_fs = _ensure_samplerate(mono, src_fs, 48000)
+        pcm, src_fs = _read_audio(file_path)
+        pcm, out_fs = _ensure_samplerate(pcm, src_fs, 48000)
         gain = gain_override or 1.0
         dev = _get_fixed_device("primary")
-        _play_mono_nonblocking(mono, out_fs, dev[0], dev[4], dev[1], "all", None, gain, file_path.name)
+        # "all" means duplicate to all channels; if stereo source, use L everywhere (simple)
+        mono_for_all = pcm[:, :1]  # take L (or mono)
+        _play_pcm_nonblocking(mono_for_all, out_fs, dev[0], dev[4], dev[1], "one", 0, gain, file_path.name)
     finally:
         if tmp_path and tmp_path.exists():
             try: tmp_path.unlink()
@@ -340,6 +484,7 @@ def play_audio(target_or_text: str, maybe_file: str | None = None, *,
     - play_audio("all", "boom.wav")
     - play_audio("The manor is opening...")
     - play_audio("frontLeft: The manor is opening...")
+    - Stereo: if stereo_<name> is configured, play_audio("<name>", file) routes to that L/R pair.
     """
     if maybe_file:
         if target_or_text.lower() == "all":
@@ -350,7 +495,9 @@ def play_audio(target_or_text: str, maybe_file: str | None = None, *,
     if ":" in target_or_text:
         name, txt = target_or_text.split(":", 1)
         name, txt = name.strip(), txt.strip()
-        if name in hdmi_channels or name in usb7_channels:
+        if name in hdmi_channels or name in usb7_channels or \
+           f"stereo_{name}" in hdmi_channels or f"stereo_{name}" in usb7_channels or \
+           f"stereo_{name}_L" in hdmi_channels or f"stereo_{name}_L" in usb7_channels:
             fd, tmp = tempfile.mkstemp(suffix=".wav"); os.close(fd)
             tmp_path = Path(tmp)
             try:
@@ -388,19 +535,19 @@ def list_output_devices() -> list[str]:
     return [f"[{i}] {d['name']} ({d['max_output_channels']}ch)" for i, d in enumerate(devices)
             if d.get("max_output_channels", 0) > 0]
 
-def list_named_channels() -> Dict[str, Dict[str, float | int | str]]:
-    out: Dict[str, Dict[str, float | int | str]] = {}
+def list_named_channels() -> Dict[str, Dict[str, Union[float, int, str, List[int]]]]:
+    out: Dict[str, Dict[str, Union[float, int, str, List[int]]]] = {}
     for k, v in hdmi_channels.items():
         out[k] = {"index": v["index"], "gain": v["gain"], "device": "primary"}
     for k, v in usb7_channels.items():
         out[k] = {"index": v["index"], "gain": v["gain"], "device": "secondary"}
     return out
 
-def register_hdmi_channel(name: str, index: int, gain: float = 1.0):
+def register_hdmi_channel(name: str, index: Union[int, List[int]], gain: float = 1.0):
     if name in usb7_channels: raise ValueError(f"'{name}' exists in usb7_channels")
     hdmi_channels[name] = {"index": index, "gain": gain}
 
-def register_usb7_channel(name: str, index: int, gain: float = 1.0):
+def register_usb7_channel(name: str, index: Union[int, List[int]], gain: float = 1.0):
     if name in hdmi_channels: raise ValueError(f"'{name}' exists in hdmi_channels")
     usb7_channels[name] = {"index": index, "gain": gain}
 

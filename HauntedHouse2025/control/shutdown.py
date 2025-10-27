@@ -58,7 +58,7 @@ def shutdown():
     m1Digital_Write(30, 1); log_event("+120v Lightning (D) OFF")
     m1Digital_Write(51, 1); log_event("+12v Rowing Skeleton Motor (D) OFF")
     m1Digital_Write(28, 1); log_event("+120v Ambient Light 6 (D) OFF")
-    m1Digital_Write(39, 0); log_event("+12v Cannon 1 Solenoid (I) OFF")
+    m1Digital_Write(39, 1); log_event("+12v Cannon 1 Solenoid (I) OFF")
     m1Digital_Write(25, 1); log_event("+120v Cannon 1 Muzzle Flash (I) OFF")
     m1Digital_Write(61, 1); log_event("Cannon 1 Smoke Machine (I) OFF")
     m1Digital_Write(41, 1); log_event("+12v Cannon 2 Solenoid (H) OFF")

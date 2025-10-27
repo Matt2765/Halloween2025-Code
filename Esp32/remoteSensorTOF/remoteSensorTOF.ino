@@ -19,7 +19,7 @@
 #define SERIAL_BAUD          115200
 
 // Give this board a clear ID for the JSON:
-#define SENSOR_ID            "TOF3"
+#define SENSOR_ID            "TOF5"
 
 // Unicast (paste receiver MAC) or broadcast (all FFs)
 uint8_t RECEIVER_MAC[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};

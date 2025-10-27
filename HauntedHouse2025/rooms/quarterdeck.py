@@ -3,7 +3,7 @@ import time as t
 from context import house
 from control.audio_manager import play_audio
 from utils.tools import BreakCheck, log_event
-from control.dimmer_controller import dimmer
+from control import dimmer_controller as dim
 
 def run():
     log_event("[SwampRoom] Starting...")
@@ -11,7 +11,6 @@ def run():
 
     while house.HouseActive or house.Demo:
         log_event("[SwampRoom] Running loop...")
-        dimmer(2, 100)  # Fire lights ON
 
         for i in range(500):
             if BreakCheck():

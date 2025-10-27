@@ -4,6 +4,7 @@ from context import house
 from control.audio_manager import play_audio
 from utils.tools import BreakCheck, log_event
 from control import dimmer_controller as dim
+from utils import speakerTest
 
 def run():
     log_event("[cargoHold] Starting...")
@@ -11,6 +12,8 @@ def run():
 
     while house.HouseActive or house.Demo:
         log_event("[cargoHold] Running loop...")
+
+        speakerTest.testAudio()
 
         t.sleep(1)
             
