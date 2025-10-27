@@ -39,6 +39,11 @@
 # BUTTON EVENTS API (optional)
 # - button_pop(timeout=0.0) -> dict|None   -- {"id": "...", "btn": N, "pressed": bool, "seq": int, "t_host_ms": int}
 #   (Use if you want edge-triggered behavior instead of sampling state.)
+#
+# CHANGELOG
+# - 2025-10-27: Interpret negative TOF readings (e.g., -1) as FAR distance
+#               (configurable via set_far_distance_mm()). Prevents false
+#               obstruction triggers when sensor cannot see a target.
 # =============================================================================
 
 from __future__ import annotations
@@ -62,6 +67,10 @@ SILENCE_RECONNECT_MS = 2000
 BACKOFF_START_S = 0.25
 BACKOFF_MAX_S = 3.0
 SHOW_LINES_PER_SEC = False
+
+# Treat any negative TOF distance (e.g., -1) as "very far/clear".
+# This avoids false positives in obstructed() and other predicates.
+FAR_DISTANCE_MM = 10000  # configurable upper bound to represent "no reading / max distance"
 
 # ---- Module-singleton state ----
 _manager: Optional[SyncManager] = None
@@ -280,6 +289,11 @@ def get_value(sensor_id: str, key: str, default: Any=None, max_age_ms: Optional[
         if (_now_ms() - t_host_ms) > max_age_ms:
             return default
     vals = rec.get("vals") or {}
+
+    # NEW: if caller asks for 'dist_mm', coerce negatives/strings to FAR_DISTANCE_MM
+    if key == "dist_mm":
+        return _coerce_dist(vals.get("dist_mm", None))
+
     return vals.get(key, default)
 
 def get_latency_ms(sensor_id: str) -> Optional[int]:
@@ -324,15 +338,16 @@ def snapshot() -> Dict[str, dict]:
 
 def _format_row(sid: str, rec: dict, now_ms: int) -> Tuple:
     vals = rec.get("vals") or {}
-    dist = vals.get("dist_mm", "")
-    # if a button, show 'pressed' instead of dist
     if "pressed" in vals:
-        dist = f"btn{vals.get('btn', '')}:{'T' if vals['pressed'] else 'F'}"
+        display = f"btn{vals.get('btn', '')}:{'T' if vals['pressed'] else 'F'}"
+    else:
+        # NEW: coerce negatives/strings to FAR for display
+        display = _coerce_dist(vals.get("dist_mm", None))
     age  = now_ms - int(rec.get("t_host_ms", 0))
     lat  = get_latency_ms(sid)
     mac  = rec.get("mac", "")
     seq  = rec.get("seq", 0)
-    return (sid, dist, age, (lat if lat is not None else ""), mac, seq)
+    return (sid, display, age, (lat if lat is not None else ""), mac, seq)
 
 def format_table() -> str:
     rows = []
@@ -396,34 +411,66 @@ def _main_cli():
 if __name__ == "__main__":
     _main_cli()
 
-# ---------- Filtering & predicates (unchanged for TOF) ----------
+# ---------- FAR distance config ----------
+def set_far_distance_mm(value: int) -> None:
+    """
+    Set the synthetic distance used when a TOF sensor reports a negative value (e.g., -1).
+    This is treated as "very far/clear".
+    """
+    global FAR_DISTANCE_MM
+    FAR_DISTANCE_MM = max(1, int(value))
+
+# ---------- Filtering & predicates (unchanged for TOF except -1 mapping) ----------
+def _coerce_dist(val) -> int:
+    """
+    Convert mixed-type distance readings to an int.
+    - Any negative or unparseable value -> FAR_DISTANCE_MM (treat as 'no target / very far')
+    - None -> FAR_DISTANCE_MM
+    """
+    if val is None:
+        return FAR_DISTANCE_MM
+    try:
+        # handles str like "-1", "123.0", floats, ints
+        v = int(round(float(val)))
+    except Exception:
+        return FAR_DISTANCE_MM
+    return FAR_DISTANCE_MM if v < 0 else v
+
 def _get_dist_sample(sid: str, ignore_neg1: bool=True, require_status_zero: bool=False):
     rec = get(sid)
     if not rec:
         return None
     vals = rec.get("vals") or {}
-    dist = vals.get("dist_mm", None)
     status = vals.get("status", None)
-    if dist is None:
-        return None
-    if ignore_neg1 and isinstance(dist, (int, float)) and dist < 0:
-        return None
+
+    # Map any negative / bad reading to FAR, even if it arrived as a string
+    dist = _coerce_dist(vals.get("dist_mm", None))
+
+    # Keep optional status gate exactly as before
     if require_status_zero and status not in (None, 0):
         return None
+
     return (int(rec.get("t_host_ms", _now_ms_local())), int(dist))
+
 
 def _hist_update(sid: str, window_ms: int, **kw):
     now = _now_ms_local()
     sample = _get_dist_sample(sid, **kw)
+
+    # keep a per-sensor deque of (timestamp_ms, distance_mm)
     h = _hist.setdefault(sid, {'q': deque(maxlen=256), 'last': False, 'last_ts': -1})
     if sample:
         t_ms, d = sample
+        # avoid duplicating the same timestamp
         if t_ms != h['last_ts']:
             h['q'].append((t_ms, d))
             h['last_ts'] = t_ms
+
     q = h['q']
+    # evict old samples from the *left* (oldest first)
     while q and (now - q[0][0]) > window_ms:
-        q.pop(0) if hasattr(q, "pop") else q.popleft()
+        q.popleft()
+
     return h
 
 def get_distance_filtered(sid: str, window_ms: int=250, min_samples: int=3,

@@ -44,7 +44,7 @@ def initialize_system():
         log_event("[System] Initializing non-persistent services...")
 
         toggleHouseLights(True)
-                
+
         spawn_doors()
 
         t.sleep(0.2)

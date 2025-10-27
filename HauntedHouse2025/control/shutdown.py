@@ -5,6 +5,7 @@ from context import house
 from control.houseLights import toggleHouseLights
 from control.audio_manager import play_audio, stop_all_audio
 from control.arduino import m1Digital_Write
+from utils.thread_diag import dump_threads
 
 def shutdown():
     log_event("[Shutdown] Executing shutdown routine...")
@@ -13,7 +14,8 @@ def shutdown():
     house.testing = False
 
     def _dim_off(ch: int):
-        for fn_name in ("dim_set", "setDimLevel", "set_dimmer_level", "dimmer_set", "set_dimmer", "setDimmer"):
+        for fn_name in ("dim_set", "setDimLevel", "set_dimmer_level",
+                        "dimmer_set", "set_dimmer", "setDimmer"):
             fn = globals().get(fn_name)
             if callable(fn):
                 try:
@@ -26,22 +28,23 @@ def shutdown():
     # ---------------- Gangway ----------------
     log_event("SHUTDOWN - Gangway:")
     m1Digital_Write(47, 1); log_event("+12v Door, Solenoid A OFF")
-    m1Digital_Write(33, 1); log_event("+12v Ambient Lights A OFF")
+    m1Digital_Write(33, 1); log_event("+120v Ambient Lights A OFF")
     m1Digital_Write(35, 1); log_event("+120v Strobe A OFF")
 
     # ---------------- Treasure Room ----------------
     log_event("SHUTDOWN - Treasure Room:")
-    if _dim_off(4): log_event("+120v Ambient Lighting (G) DIM CH.4 OFF")
+    m1Digital_Write(3, 1);  log_event("+120v Ambient Light 4 (G) OFF")   # moved from DIM CH.4 -> D3
     m1Digital_Write(2, 1);  log_event("+120v Strobe 3 (G) OFF")
     m1Digital_Write(26, 1); log_event("+120v Lightning (G) OFF")
     m1Digital_Write(24, 1); log_event("+120v Blacklight (G) OFF")
 
     # ---------------- Quarterdeck ----------------
     log_event("SHUTDOWN - Quarterdeck:")
-    m1Digital_Write(23, 1); log_event("+120v Ambient Light 3 (B) OFF")
+    m1Digital_Write(9,  1); log_event("+120v Strobe 2 (F) OFF")           # NEW: D9
+    m1Digital_Write(23, 1); log_event("+120v Lightning (B) OFF")
     m1Digital_Write(53, 1); log_event("+12v Prisoner Arms (F) OFF")
-    m1Digital_Write(38, 1); log_event("+12v Door, Solenoid F OFF")
-    if _dim_off(1): log_event("+120v Drop Down Light (B) DIM CH.1 OFF")
+    m1Digital_Write(38, 1); log_event("+12v Door 2, Solenoid F OFF")
+    m1Digital_Write(4,  1); log_event("+120v Drop Down Light (B) OFF")    # D4
 
     # ---------------- Graveyard ----------------
     log_event("SHUTDOWN - Graveyard:")
@@ -49,13 +52,13 @@ def shutdown():
     m1Digital_Write(58, 1); log_event("+120v Enemy Cannon Smoke Machine (L) OFF")
     m1Digital_Write(31, 1); log_event("+120v Enemy Cannon Muzzle Flash (L) OFF")
     m1Digital_Write(40, 1); log_event("+12v Water Blast (M) OFF")
-    if _dim_off(5): log_event("+120v Ship Lights 1 (M) DIM CH.5 OFF")
-    if _dim_off(6): log_event("+120v Ship Lights 2 (M) DIM CH.6 OFF")
+    m1Digital_Write(6,  1); log_event("+120v Ship Lights 1 (M) OFF")      # D6
+    m1Digital_Write(7,  1); log_event("+120v Ship Lights 2 (M) OFF")      # D7
 
     # ---------------- Cargo Hold ----------------
     log_event("SHUTDOWN - Cargo Hold:")
     m1Digital_Write(49, 1); log_event("+12v Barrel Solenoid (D) OFF")
-    m1Digital_Write(30, 1); log_event("+120v Lightning (D) OFF")
+    m1Digital_Write(30, 1); log_event("+120v Lightning 2 (D) OFF")
     m1Digital_Write(51, 1); log_event("+12v Rowing Skeleton Motor (D) OFF")
     m1Digital_Write(28, 1); log_event("+120v Ambient Light 6 (D) OFF")
     m1Digital_Write(39, 1); log_event("+12v Cannon 1 Solenoid (I) OFF")
@@ -70,16 +73,16 @@ def shutdown():
     m1Digital_Write(37, 1); log_event("+120v Ambient Lights 2 (C) OFF")
     m1Digital_Write(36, 1); log_event("+120v Strobe 6 (C) OFF")
     m1Digital_Write(34, 1); log_event("+120v Strobe 4 / Blacklight (C) OFF")
-    if _dim_off(3): log_event("+120v Ambient Light 7 (C) DIM CH.3 OFF")
+    m1Digital_Write(5,  1); log_event("+120v Ambient Light 7 (C) OFF")    # moved from DIM CH.3 -> D5
 
     # ---------------- Deck ----------------
     log_event("SHUTDOWN - Deck:")
     m1Digital_Write(43, 1); log_event("+12v Falling Mast Solenoid (E) OFF")
-    m1Digital_Write(29, 1); log_event("+120v Lightning (E) OFF")
+    m1Digital_Write(29, 1); log_event("+120v Lightning 4 (E) OFF")
     m1Digital_Write(59, 1); log_event("Fire Lights Smoke Machine (E) OFF")
     m1Digital_Write(32, 1); log_event("+120v Strobes (K) OFF")
     if _dim_off(2): log_event("+120v Fire Lights (K) DIM CH.2 OFF")
-    if _dim_off(7): log_event("+120v Ambient Lights (K) DIM CH.7 OFF")
+    m1Digital_Write(8,  1); log_event("+120v Ambient Lights 5 (K) OFF")   # D8 (no longer DIM CH.7)
 
     t.sleep(1)
     toggleHouseLights(True)
@@ -129,6 +132,7 @@ def shutdownDetector():
         for a in range(5, 0, -1):
             log_event(f"Returning to standby in {a} seconds.")
             t.sleep(1)
+        #dump_threads()
         house.systemState = "REBOOT"
         play_audio("system rebooting", gain=0.1)
 

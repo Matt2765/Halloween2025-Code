@@ -2,7 +2,7 @@
 import time as t
 import threading
 from control.arduino import m1Digital_Write
-from utils.tools import log_event, BreakCheck
+from utils.tools import log_event
 from context import house
 from control import remote_sensor_monitor as rsm
 
@@ -21,7 +21,7 @@ SENSOR_POLL_S            = 0.1
 DOOR_SELF_PASS_IGNORE_S = {1: 0.60, 2: 0.60}
 
 # Obstruction thresholds + detection profiles
-BLOCK_MM_ENTER   = 800   # threshold to consider "blocked"
+BLOCK_MM_ENTER   = 1200   # threshold to consider "blocked"
 BLOCK_MM_CLEAR   = 900   # reserved if you later implement explicit hysteresis in rsm
 
 IDLE_WINDOW_MS   = 250   # sensitive when idle
@@ -36,6 +36,8 @@ CLEAR_HOLD_S      = 0.25  # require brief clear before declaring closed
 def setDoorState(id, state):
     if id in (1, 2) and state in ("OPEN", "CLOPEN", "CLOSED"):
         house.TargetDoorState[id] = state
+        #print(house.TargetDoorState[id])
+        #print(house.DoorState[id])
         log_event(f"[Doors] Set Door {id} → {state}")
     else:
         log_event(f"[Doors] Invalid door or state: id={id}, state={state}")
@@ -78,7 +80,7 @@ def door_process(id: int):
         last_clear_ts = t.time()
 
         while (t.time() - start) < CLOSE_MONITOR_WINDOW_S and house.systemState == "ONLINE":
-            if BreakCheck():
+            if not house.systemState == "ONLINE":
                 return False
 
             if door_sensor_obstructed(moving=True):
@@ -113,7 +115,7 @@ def door_process(id: int):
         elif target == "CLOSED":
             # keep retrying until closed or system goes offline/BreakCheck
             while house.systemState == "ONLINE" and house.TargetDoorState[id] == "CLOSED":
-                if BreakCheck():
+                if not house.systemState == "ONLINE":
                     break
 
                 # If obstructed before moving, be sensitive (idle profile)
@@ -132,13 +134,16 @@ def door_process(id: int):
 
     def main():
         house.DoorState[id] = "OPEN"
+
+        t.sleep(1)  # allow system to startup
+        
         while house.systemState == "ONLINE":
+            #print("Door running:", id)
             if house.DoorState[id] != house.TargetDoorState[id]:
                 handle_change()
-            if BreakCheck():
-                break
-            t.sleep(0.1)
-        log_event(f"[Doors] System shutdown: Door {id} exiting and opening")
+            t.sleep(0.05)
+
+        log_event(f"[Doors] System shutdown: Door {id} opening")
         open()
 
     open()
@@ -148,5 +153,6 @@ def door_process(id: int):
 def spawn_doors():
     for door_id in DOOR_SOLENOID_PINS.keys():
         house.DoorState[door_id] = "OPEN"
-        threading.Thread(target=door_process, args=(door_id,), daemon=True).start()
+        house.TargetDoorState[door_id] = "OPEN"
+        threading.Thread(target=door_process, args=(door_id,), daemon=True, name=f"Door {door_id} Process").start()
     log_event("[Doors] All door threads started.")

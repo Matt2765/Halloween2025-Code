@@ -1,8 +1,7 @@
 # ui/gui.py
 import tkinter as tk
 import threading
-from rooms import quarterdeck
-from rooms import cargoHold, gangway, treasureRoom
+from rooms import cargoHold, gangway, treasureRoom, graveyard, quarterdeck
 from context import house
 from control.shutdown import shutdown
 from control.doors import setDoorState
@@ -12,32 +11,33 @@ from utils.tools import log_event
 # NEW: read-only sensor values
 from control import remote_sensor_monitor as rsm  # minimal addition
 
+
 def demoEvent(room):
     house.Demo = True
     house.HouseActive = True
     toggleHouseLights(False)
     log_event(f"[GUI] Starting demo of {room}")
 
-    from rooms import graveyard
-    if room == 'GW':
-        threading.Thread(target=gangway.run, args=()).start()
-    elif room == 'TR':
-        threading.Thread(target=treasureRoom.run, args=()).start()
-    elif room == 'SR':
-        threading.Thread(target=quarterdeck.run, args=()).start()
-    elif room == 'MkR':
-        threading.Thread(target=cargoHold.run, args=()).start()
-    elif room == 'GY':
-        threading.Thread(target=graveyard.run, args=()).start()
+    if room == gangway.__name__.split('.')[-1]:
+        threading.Thread(target=gangway.run, args=(), name=f"{room} demo").start()
+    elif room == treasureRoom.__name__.split('.')[-1]:
+        threading.Thread(target=treasureRoom.run, args=(), name=f"{room} demo").start()
+    elif room == quarterdeck.__name__.split('.')[-1]:
+        threading.Thread(target=quarterdeck.run, args=(), name=f"{room} demo").start()
+    elif room == cargoHold.__name__.split('.')[-1]:
+        threading.Thread(target=cargoHold.run, args=(), name=f"{room} demo").start()
+    elif room == graveyard.__name__.split('.')[-1]:
+        threading.Thread(target=graveyard.run, args=(), name=f"{room} demo").start()
+
 
 def change_system_state(new_state):
     house.systemState = new_state
 
+
 def MainGUI():
     from control.system import StartHouse
-    
     log_event(f"[GUI] Booting main GUI...")
-    
+
     root = tk.Tk()
     root.configure(background="orange")
     root.title("Halloween 2025 Control Panel")
@@ -63,21 +63,18 @@ def MainGUI():
               command=lambda: setDoorState(2, "OPEN")).place(x=25, y=285)
     tk.Button(root, text="Close Door 2", height=2, width=15,
               command=lambda: setDoorState(2, "CLOSED")).place(x=150, y=285)
-    tk.Button(root, text="Open Door 3", height=2, width=15,
-              command=lambda: setDoorState(3, "OPEN")).place(x=25, y=335)
-    tk.Button(root, text="Close Door 3", height=2, width=15,
-              command=lambda: setDoorState(3, "CLOSED")).place(x=150, y=335)
 
-    tk.Button(root, text="Demo Gangway", height=2, width=15,
-              command=lambda: demoEvent('GW')).place(x=150, y=430)
-    tk.Button(root, text="Demo Quarterdeck", height=2, width=15,
-              command=lambda: demoEvent('SR')).place(x=25, y=430)
-    tk.Button(root, text="Demo Graveyard", height=2, width=15,
-              command=lambda: demoEvent('GY')).place(x=275, y=430)
-    tk.Button(root, text="Demo Treasure Room", height=2, width=15,
-              command=lambda: demoEvent("TR")).place(x=25, y=480)
-    tk.Button(root, text="Demo Cargo Hold", height=2, width=15,
-              command=lambda: demoEvent("MkR")).place(x=150, y=480)
+    # DEMO CONTROLS (strip "rooms." prefix)
+    tk.Button(root, text=f"Demo {gangway.__name__.split('.')[-1]}", height=2, width=15,
+              command=lambda: demoEvent(gangway.__name__.split('.')[-1])).place(x=150, y=430)
+    tk.Button(root, text=f"Demo {quarterdeck.__name__.split('.')[-1]}", height=2, width=15,
+              command=lambda: demoEvent(quarterdeck.__name__.split('.')[-1])).place(x=25, y=430)
+    tk.Button(root, text=f"Demo {graveyard.__name__.split('.')[-1]}", height=2, width=15,
+              command=lambda: demoEvent(graveyard.__name__.split('.')[-1])).place(x=275, y=430)
+    tk.Button(root, text=f"Demo {treasureRoom.__name__.split('.')[-1]}", height=2, width=15,
+              command=lambda: demoEvent(treasureRoom.__name__.split('.')[-1])).place(x=25, y=480)
+    tk.Button(root, text=f"Demo {cargoHold.__name__.split('.')[-1]}", height=2, width=15,
+              command=lambda: demoEvent(cargoHold.__name__.split('.')[-1])).place(x=150, y=480)
 
     tk.Button(root, text="Start Testing", height=2, width=15, command=None).place(x=25, y=570)
     tk.Button(root, text="Toggle House Lights", height=3, width=25, bg="chartreuse2",
@@ -100,7 +97,7 @@ def MainGUI():
         lbl.place(x=100, y=row_y)
         tof_labels[sid] = lbl
 
-    # ----- Single-button boxes (BTN1..BTN4) - persistent True/False
+    # ----- Single-button boxes (BTN1..BTN4)
     btn_ids = ["BTN1", "BTN2", "BTN3", "BTN4"]
     btn_labels = {}
     btn_states = {sid: False for sid in btn_ids}
@@ -118,7 +115,7 @@ def MainGUI():
 
     multi_state = {"states": [False, False, False, False], "last_seq": -1}
     multi_labels = []
-    mp_row_y = base_y + 5*32 + 12 + 26  # start under the label
+    mp_row_y = base_y + 5*32 + 12 + 26
 
     for i in range(4):
         tk.Label(root, text=f"Btn{i+1}", font=("Helvetica", 12), bg="orange").place(x=25, y=mp_row_y + i*26)
@@ -137,14 +134,14 @@ def MainGUI():
                 except Exception:
                     lbl.config(text=f"{v} mm")
 
-        # Single-button states (hold last)
+        # Single-button states
         for sid, lbl in btn_labels.items():
             pressed = rsm.get_value(sid, "pressed", default=None)
             if pressed is not None:
                 btn_states[sid] = bool(pressed)
             lbl.config(text=str(btn_states[sid]))
 
-        # Multi-button (apply only on new seq)
+        # Multi-button (update only on new seq)
         rec = rsm.get(multi_id)
         if rec:
             try:
@@ -162,7 +159,6 @@ def MainGUI():
                     multi_state["states"][btn_n - 1] = pressed
                 multi_state["last_seq"] = seq
 
-        # reflect multi states to labels every tick
         for i, lbl in enumerate(multi_labels):
             lbl.config(text=str(multi_state["states"][i]))
 
