@@ -11,6 +11,9 @@
 #     - Either a single entry with index=[L,R]
 #     - Or two entries: "stereo_<name>_L" and "stereo_<name>_R"
 #   play_audio("<name>", file) will auto-use stereo_<name> if present.
+# + looping=True/False (loops file audio until BreakCheck() or stop_all_audio())
+# + TTS plays through shutdown & BreakCheck (immune), and now plays on ALL channels by default
+# + NEW mode "all": duplicate mono to every output channel on the device
 # -------------------------------------------------------------------
 
 from __future__ import annotations
@@ -20,7 +23,7 @@ from typing import Dict, Optional, Tuple, List, Union
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
-from utils.tools import log_event
+from utils.tools import log_event, BreakCheck
 
 # ==========================================================
 # === CONFIGURATION ========================================
@@ -42,9 +45,7 @@ hdmi_channels: Dict[str, Dict[str, Union[float, int, List[int]]]] = {
     "cargoHold":    {"index": 5, "gain": 1.6},
     "HDMI_BL":      {"index": 6, "gain": 1.8},
     "HDMI_BR":      {"index": 7, "gain": 1.8},
-    # Example stereo on HDMI (if you want it):
     # "stereo_front": {"index": [0, 1], "gain": 1.0},
-    # or two entries:
     # "stereo_front_L": {"index": 0, "gain": 1.0},
     # "stereo_front_R": {"index": 1, "gain": 1.0},
 }
@@ -129,9 +130,7 @@ def _read_audio(file_path: Path) -> tuple[np.ndarray, int]:
         return data.astype("float32"), int(fs)
     if ch == 2:
         return data[:, :2].astype("float32"), int(fs)
-    # Downmix >2 to stereo by averaging L group / R group evenly
-    # Simple approach: average all channels to stereo equally
-    mean_mono = data.mean(axis=1, keepdims=True)
+    mean_mono = data.mean(axis=1, keepdims=True)  # simple downmix to mono
     stereo = np.repeat(mean_mono, 2, axis=1)
     return stereo.astype("float32"), int(fs)
 
@@ -153,7 +152,7 @@ def _pack_device(idx: int) -> Tuple[int, int, int, str, str]:
     default_fs = int(round(float(d.get("default_samplerate", 48000.0))))
     hostapis = sd.query_hostapis()
     hostapi_name = "unknown"
-    for i, h in enumerate(hostapis):
+    for h in hostapis:
         if idx in h.get("devices", []):
             hostapi_name = h.get("name", "unknown")
             break
@@ -182,12 +181,10 @@ def _maybe_pair_from_entry(name: str, tbl: Dict[str, Dict[str, Union[float, int,
     Returns [L, R] or None.
     """
     base = f"stereo_{name}"
-    # Single entry with list/tuple
     if base in tbl:
         idx = tbl[base].get("index")
         if isinstance(idx, (list, tuple)) and len(idx) == 2:
             return [int(idx[0]), int(idx[1])]
-    # _L / _R form
     l_key, r_key = f"{base}_L", f"{base}_R"
     if l_key in tbl and r_key in tbl:
         l_idx = tbl[l_key].get("index")
@@ -201,7 +198,6 @@ def _lookup_in_tables(name: str) -> Tuple[str, Dict[str, Dict[str, Union[float, 
         return "primary", hdmi_channels
     if name in usb7_channels or f"stereo_{name}" in usb7_channels or f"stereo_{name}_L" in usb7_channels:
         return "secondary", usb7_channels
-    # If not explicitly in either, prefer primary then secondary for stereo hints
     return "primary", hdmi_channels
 
 def _resolve_named_target(name: str) -> Tuple[str, str, Union[int, List[int]], float]:
@@ -212,18 +208,14 @@ def _resolve_named_target(name: str) -> Tuple[str, str, Union[int, List[int]], f
       - index_or_pair: int for mono, [L,R] for stereo
       - gain: float
     """
-    # Decide which table this name belongs to (or should try)
     dev_kind, tbl = _lookup_in_tables(name)
 
-    # 1) If a stereo mapping exists (preferred)
     pair = _maybe_pair_from_entry(name, tbl)
     if pair is not None:
-        # Choose gain from the base stereo entry or fall back to 1.0
         base = f"stereo_{name}"
         if base in tbl and isinstance(tbl[base].get("gain", 1.0), (int, float)):
             gain = float(tbl[base]["gain"])
         else:
-            # Else average _L and _R gains if present, else 1.0
             l_key, r_key = f"{base}_L", f"{base}_R"
             gains = []
             for k in (l_key, r_key):
@@ -232,17 +224,14 @@ def _resolve_named_target(name: str) -> Tuple[str, str, Union[int, List[int]], f
             gain = sum(gains)/len(gains) if gains else 1.0
         return dev_kind, "stereo", [int(pair[0]), int(pair[1])], gain
 
-    # 2) Otherwise, look for a mono mapping
     if name in tbl:
         v = tbl[name]
         idx = v.get("index")
         gain = float(v.get("gain", 1.0))
-        # If user accidentally set a list here, treat it as stereo too
         if isinstance(idx, (list, tuple)) and len(idx) == 2:
             return dev_kind, "stereo", [int(idx[0]), int(idx[1])], gain
         return dev_kind, "one", int(idx), gain
 
-    # If not found in selected table, try the other one explicitly
     other_kind, other_tbl = ("secondary", usb7_channels) if dev_kind == "primary" else ("primary", hdmi_channels)
     pair = _maybe_pair_from_entry(name, other_tbl)
     if pair is not None:
@@ -286,7 +275,7 @@ def _open_stream_robust(fs: int, have_channels: int, device_index: int, device_n
     """
     Open by fixed device INDEX. Host-API aware:
       - If the device is WASAPI: try exclusive -> shared at requested fs
-      - Otherwise (MME/DirectSound/WDM-KS/etc): open generic shared at the DEVICE DEFAULT fs
+      - Otherwise: open generic shared at the DEVICE DEFAULT fs
       - Optional fallback to system default
     Returns (stream, used_fs)
     """
@@ -328,9 +317,9 @@ def _open_stream_robust(fs: int, have_channels: int, device_index: int, device_n
 
     try:
         dev_default_fs = int(round(float(sd.query_devices()[device_index].get("default_samplerate", fs))))
-        return _try(device_index, None, dev_default_fs, "generic shared (hostapi!=WASAPI)"), dev_default_fs
+        return _try(device_index, None, dev_default_fs, "generic shared"), dev_default_fs
     except Exception as e:
-        log_event(f"[Audio] Fail generic shared on hostapi '{hostapi}': {e}")
+        log_event(f"[Audio] Fail generic shared: {e}")
 
     if FALLBACK_TO_SYSTEM_DEFAULT:
         try:
@@ -346,11 +335,20 @@ def _open_stream_robust(fs: int, have_channels: int, device_index: int, device_n
 def _play_pcm_nonblocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
                           have_channels: int, mode: str,
                           idx_or_pair: Union[int, List[int]],
-                          gain: float, label: str):
+                          gain: float, label: str,
+                          *, looping: bool = False,
+                          honor_shutdown: bool = True,
+                          honor_breakcheck: bool = True):
     """
     pcm: float32 (N, Csrc), Csrc in {1,2}
-    mode: "one" (mono target) or "stereo" (two indices target)
-    idx_or_pair: int for mono channel index, [L,R] for stereo indices
+    mode: "one" | "stereo" | "all"
+      - "one" routes mono to a single output index
+      - "stereo" routes L/R to two indices
+      - "all" duplicates mono to EVERY available output channel
+    idx_or_pair: int for mono channel index, [L,R] for stereo indices (ignored for "all")
+    looping: when True, repeats until BreakCheck()/stop_all_audio() (ignored for TTS)
+    honor_shutdown: when False, ignore stop_all_audio() flags (for TTS)
+    honor_breakcheck: when False, ignore BreakCheck() (for TTS)
     """
     epoch = _next_epoch()
     session = _Session(epoch, label)
@@ -367,50 +365,65 @@ def _play_pcm_nonblocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
                 blocksize = stream.blocksize or max(512, used_fs // 25)
                 zero_blk = np.zeros((blocksize, have_channels), np.float32)
                 stream.write(zero_blk)
-                n = pcm_res.shape[0]; pos = 0
+                n = pcm_res.shape[0]
                 src_ch = pcm_res.shape[1]
-                while pos < n:
-                    if epoch <= _cutoff_epoch or _stop_event.is_set(): break
+
+                pos = 0
+                while True:
+                    if honor_breakcheck and BreakCheck():
+                        break
+                    if honor_shutdown and (epoch <= _cutoff_epoch or _stop_event.is_set()):
+                        break
+
                     end = min(pos + blocksize, n)
                     block = pcm_res[pos:end] * gain  # (B, Csrc)
 
                     # Build output frame (B, have_channels)
                     if have_channels <= 1:
-                        # Collapse to mono device
-                        out = block[:, :1] if src_ch == 1 else block[:, :1]  # L only
+                        out = block[:, :1]
                     elif have_channels == 2:
                         if mode == "stereo":
-                            # Direct to L/R
-                            if src_ch == 1:
-                                out = np.column_stack((block[:, 0], block[:, 0]))
-                            else:
-                                out = block[:, :2]
+                            out = np.column_stack((block[:, 0], block[:, 0])) if src_ch == 1 else block[:, :2]
+                        elif mode == "all":
+                            # duplicate mono to both
+                            mono = block[:, 0:1]
+                            out = np.concatenate([mono, mono], axis=1)
                         else:
-                            # mono target -> duplicate to both
                             out = np.column_stack((block[:, 0], block[:, 0]))
                     else:
-                        out = np.zeros((block.shape[0], have_channels), np.float32)
-                        if mode == "stereo":
-                            L, R = int(idx_or_pair[0]), int(idx_or_pair[1])
-                            if src_ch == 1:
-                                out[:, L] = block[:, 0]
-                                out[:, R] = block[:, 0]
-                            else:
-                                out[:, L] = block[:, 0]
-                                out[:, R] = block[:, 1]
+                        if mode == "all":
+                            mono = block[:, 0:1]  # use L/mono
+                            out = np.repeat(mono, have_channels, axis=1)
                         else:
-                            idx = min(int(idx_or_pair), have_channels - 1)
-                            out[:, idx] = block[:, 0]
+                            out = np.zeros((block.shape[0], have_channels), np.float32)
+                            if mode == "stereo":
+                                L, R = int(idx_or_pair[0]), int(idx_or_pair[1])
+                                if src_ch == 1:
+                                    out[:, L] = block[:, 0]
+                                    out[:, R] = block[:, 0]
+                                else:
+                                    out[:, L] = block[:, 0]
+                                    out[:, R] = block[:, 1]
+                            else:
+                                idx = min(int(idx_or_pair), have_channels - 1)
+                                out[:, idx] = block[:, 0]
 
                     stream.write(out)
                     pos = end
+
+                    if pos >= n:
+                        if looping:
+                            pos = 0
+                        else:
+                            break
         finally:
             with _active_lock:
                 if stream in _active_streams: _active_streams.remove(stream)
                 if session in _active_sessions: _active_sessions.remove(session)
             session.done.set()
 
-    threading.Thread(target=_worker, daemon=True, name=f"Audio@{epoch}").start()
+    tname = f"Looping Audio@{epoch}" if looping else f"Audio@{epoch}"
+    threading.Thread(target=_worker, daemon=True, name=tname).start()
 
 # ==========================================================
 # === PUBLIC PLAYBACK API =================================
@@ -418,7 +431,18 @@ def _play_pcm_nonblocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
 
 def play_to_named_channel(wav_file: str, target_name: str, * ,
                           gain_override: float | None = None,
-                          base_folder: Path | str | None = None):
+                          base_folder: Path | str | None = None,
+                          looping: bool = False,
+                          honor_shutdown: bool = True,
+                          honor_breakcheck: bool = True):
+    """
+    honor_shutdown:
+      - True (default): stream stops on stop_all_audio()
+      - False: ignores stop_all_audio() (used for TTS)
+    honor_breakcheck:
+      - True (default): stops when BreakCheck() is True
+      - False: ignores BreakCheck() (used for TTS)
+    """
     base_path = Path(base_folder) if base_folder else DEFAULT_SOUND_DIR
     file_path = _resolve_sound_path(wav_file, base_folder=base_path)
     if not file_path.exists():
@@ -431,7 +455,6 @@ def play_to_named_channel(wav_file: str, target_name: str, * ,
     pcm, out_fs = _ensure_samplerate(pcm, src_fs, 48000)
 
     dev = _get_fixed_device(dev_kind)
-    # Clamp indices to device channel count if needed
     if mode == "one":
         ch = min(int(idx_or_pair), dev[1] - 1)
         idx_or_pair = ch
@@ -442,19 +465,35 @@ def play_to_named_channel(wav_file: str, target_name: str, * ,
         idx_or_pair = [L, R]
         extra = f"L={L},R={R}"
 
-    log_event(f"[Audio] Playing '{file_path.name}' on {dev_kind.upper()} {mode} ({extra}), gain={gain}")
-    _play_pcm_nonblocking(pcm, out_fs, dev[0], dev[4], dev[1], mode, idx_or_pair, gain, f"{file_path.name}@{target_name}")
+    log_event(f"[Audio] Playing '{file_path.name}' on {dev_kind.upper()} {mode} ({extra}), "
+              f"gain={gain}, looping={looping}, honor_shutdown={honor_shutdown}, honor_breakcheck={honor_breakcheck}")
+    _play_pcm_nonblocking(
+        pcm, out_fs, dev[0], dev[4], dev[1], mode, idx_or_pair, gain,
+        f"{file_path.name}@{target_name}",
+        looping=looping,
+        honor_shutdown=honor_shutdown,
+        honor_breakcheck=honor_breakcheck
+    )
 
 def play_to_all_channels(wav_or_text: str, *, tts_rate: int = 0,
                          gain_override: float | None = None,
-                         base_folder: Path | str | None = None):
+                         base_folder: Path | str | None = None,
+                         looping: bool = False,
+                         honor_shutdown: bool = True,
+                         honor_breakcheck: bool = True):
+    """
+    Broadcast a clip (file or TTS) to ALL output channels on PRIMARY.
+    For TTS (text input), set honor_shutdown=False and honor_breakcheck=False upstream.
+    """
     base_path = Path(base_folder) if base_folder else DEFAULT_SOUND_DIR
     tmp_path = None
     try:
         treat_as_file = Path(wav_or_text).suffix.lower() == ".wav"
         if not treat_as_file:
             abs_candidate = (base_path / wav_or_text)
-            if abs_candidate.exists(): treat_as_file = True
+            if abs_candidate.exists():
+                treat_as_file = True
+
         if treat_as_file:
             file_path = _resolve_sound_path(wav_or_text, base_folder=base_path)
         else:
@@ -462,36 +501,69 @@ def play_to_all_channels(wav_or_text: str, *, tts_rate: int = 0,
             tmp_path = Path(tmp)
             text_to_wav(wav_or_text, tmp_path, tts_rate)
             file_path = tmp_path
+
         pcm, src_fs = _read_audio(file_path)
+        # Force mono source for "all" duplication (take L or mono)
+        if pcm.ndim == 2 and pcm.shape[1] > 1:
+            pcm = pcm[:, :1]
         pcm, out_fs = _ensure_samplerate(pcm, src_fs, 48000)
         gain = gain_override or 1.0
         dev = _get_fixed_device("primary")
-        # "all" means duplicate to all channels; if stereo source, use L everywhere (simple)
-        mono_for_all = pcm[:, :1]  # take L (or mono)
-        _play_pcm_nonblocking(mono_for_all, out_fs, dev[0], dev[4], dev[1], "one", 0, gain, file_path.name)
+
+        log_event(f"[Audio] Playing '{Path(file_path).name}' to ALL on PRIMARY, gain={gain}, "
+                  f"looping={looping}, honor_shutdown={honor_shutdown}, honor_breakcheck={honor_breakcheck}")
+        # mode="all" duplicates mono to every available output channel
+        _play_pcm_nonblocking(
+            pcm, out_fs, dev[0], dev[4], dev[1], "all", 0, gain,
+            Path(file_path).name,
+            looping=looping,
+            honor_shutdown=honor_shutdown,
+            honor_breakcheck=honor_breakcheck
+        )
     finally:
         if tmp_path and tmp_path.exists():
             try: tmp_path.unlink()
             except OSError: pass
 
-def play_audio(target_or_text: str, maybe_file: str | None = None, *,
+def play_audio(target_or_text: str, maybe_file: str | None = None, * ,
                gain: float | None = None,
                base_folder: Path | str | None = None,
-               tts_rate: int = 0):
+               tts_rate: int = 0,
+               looping: bool = False):
     """
-    - play_audio("frontLeft", "boom.wav")
-    - play_audio("usb_C", "boom.wav")
-    - play_audio("all", "boom.wav")
-    - play_audio("The manor is opening...")
-    - play_audio("frontLeft: The manor is opening...")
+    - play_audio("frontLeft", "boom.wav")           # file -> named (respects shutdown & BreakCheck)
+    - play_audio("usb_C", "boom.wav")               # file -> named
+    - play_audio("all", "boom.wav")                 # file -> broadcast ALL (respects shutdown & BreakCheck)
+    - play_audio("The manor is opening...")         # TTS -> broadcast ALL, IGNORES shutdown & BreakCheck
+    - play_audio("frontLeft: The manor is opening...")  # TTS -> named, IGNORES shutdown & BreakCheck
     - Stereo: if stereo_<name> is configured, play_audio("<name>", file) routes to that L/R pair.
+    - looping=True loops file audio only (TTS is not looped).
     """
+    # FILED AUDIO paths
     if maybe_file:
         if target_or_text.lower() == "all":
-            play_to_all_channels(maybe_file, gain_override=gain, base_folder=base_folder)
+            # broadcast file to ALL; this SHOULD respect shutdown & BreakCheck
+            play_to_all_channels(
+                maybe_file,
+                gain_override=gain,
+                base_folder=base_folder,
+                looping=looping,
+                honor_shutdown=True,
+                honor_breakcheck=True
+            )
         else:
-            play_to_named_channel(maybe_file, target_or_text, gain_override=gain, base_folder=base_folder)
+            play_to_named_channel(
+                maybe_file,
+                target_or_text,
+                gain_override=gain,
+                base_folder=base_folder,
+                looping=looping,
+                honor_shutdown=True,
+                honor_breakcheck=True
+            )
         return
+
+    # "name: text" => TTS on named channel (immune to shutdown & BreakCheck)
     if ":" in target_or_text:
         name, txt = target_or_text.split(":", 1)
         name, txt = name.strip(), txt.strip()
@@ -502,18 +574,40 @@ def play_audio(target_or_text: str, maybe_file: str | None = None, *,
             tmp_path = Path(tmp)
             try:
                 text_to_wav(txt, tmp_path, tts_rate)
-                play_to_named_channel(str(tmp_path), name, gain_override=gain, base_folder=base_folder)
+                play_to_named_channel(
+                    str(tmp_path),
+                    name,
+                    gain_override=gain,
+                    base_folder=base_folder,
+                    looping=False,
+                    honor_shutdown=False,     # immune
+                    honor_breakcheck=False    # immune
+                )
             finally:
                 try: tmp_path.unlink()
                 except OSError: pass
             return
-    play_to_all_channels(target_or_text, tts_rate=tts_rate, gain_override=gain, base_folder=base_folder)
+
+    # Bare TEXT => TTS broadcast to ALL (immune)
+    play_to_all_channels(
+        target_or_text,
+        tts_rate=tts_rate,
+        gain_override=gain,
+        base_folder=base_folder,
+        looping=False,
+        honor_shutdown=False,     # immune
+        honor_breakcheck=False    # immune
+    )
 
 # ==========================================================
 # === CONTROL / UTILITY ===================================
 # ==========================================================
 
 def stop_all_audio(timeout: float = 2.0):
+    """
+    Signals all honor_shutdown=True streams to stop soon.
+    Streams started with honor_shutdown=False (TTS) will IGNORE this cutoff and finish naturally.
+    """
     global _cutoff_epoch
     with _epoch_lock:
         snapshot = _play_epoch
@@ -525,7 +619,8 @@ def stop_all_audio(timeout: float = 2.0):
     while time.time() < deadline:
         with _active_lock:
             active = [s for s in _active_sessions if not s.done.is_set()]
-        if not active: break
+        if not active:
+            break
         time.sleep(0.05)
     _stop_event.clear()
     log_event(f"[Audio] stop_all_audio(): complete")

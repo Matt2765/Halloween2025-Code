@@ -2,6 +2,7 @@
 # pip install pyserial
 
 import serial, time, random, threading
+from utils.tools import BreakCheck
 
 # ---- Hardcode UNO port here ----
 PORT = "COM7"      # change if needed
@@ -12,13 +13,24 @@ _ser = None
 _lock = threading.Lock()
 _current_pct = 0.0
 _stop_event = threading.Event()
+_flicker_thread: threading.Thread | None = None
+_last_sent_int: int | None = None  # avoid redundant writes
 
+# ----------------------------
+# Internal serial helpers
+# ----------------------------
 def _writeln(line: str):
+    """Safe write with lock. Dim writes should NOT be gated by BreakCheck()."""
     if _ser is None:
         raise RuntimeError("dimmer.init() must be called first.")
+    data = (line + "\n").encode("ascii")
     with _lock:
-        _ser.write((line + "\n").encode("ascii"))
-        _ser.flush()
+        try:
+            _ser.write(data)
+            # Avoid flush() stalls under shutdown; OS buffering is fine.
+        except Exception:
+            # Swallow write errors during teardown
+            pass
 
 def _readline_nonblock():
     try:
@@ -26,67 +38,83 @@ def _readline_nonblock():
     except Exception:
         return ""
 
-def init(port: str = None):
+# ----------------------------
+# Public control
+# ----------------------------
+def init(port: str | None = None):
     """Open serial to UNO. If port is given, overrides the hardcoded PORT."""
-    global _ser, PORT
-    if port: PORT = port
+    global _ser, PORT, _last_sent_int
+    if port:
+        PORT = port
     _ser = serial.Serial(PORT, BAUD, timeout=TIMEOUT)
+    _last_sent_int = None
     _writeln("PING"); _readline_nonblock()
     _writeln("INFO"); _readline_nonblock()
     dim(15)  # safe start
 
 def close():
+    """Close serial cleanly."""
     global _ser
-    if _ser:
-        try: _ser.close()
-        finally: _ser = None
+    try:
+        if _ser:
+            _ser.close()
+    finally:
+        _ser = None
+
+def request_stop():
+    """Signal all dimmer activity (ramps/flicker) to stop ASAP."""
+    _stop_event.set()
+
+def clear_stop():
+    """Clear the global stop flag (only call when safe)."""
+    _stop_event.clear()
 
 def dim(value: float):
-    """Logical 0..100 (UNO maps to 0..93 and enforces floor)."""
-    global _current_pct
+    """
+    Logical 0..100 (UNO maps to its own raw range).
+    Intentionally NOT interrupted by BreakCheck() or stop flag.
+    """
+    global _current_pct, _last_sent_int
     pct = max(0.0, min(100.0, float(value)))
     _current_pct = pct
-    _writeln(f"SET {int(round(pct))}")
-
-def _ramp(from_pct: float, to_pct: float, duration: float, step_s: float = 0.02):
-    if duration <= 0:
-        dim(to_pct); return
-    steps = max(1, int(duration / step_s))
-    for i in range(1, steps + 1):
-        if _stop_event.is_set(): return
-        t = i / float(steps)
-        v = from_pct + (to_pct - from_pct) * t
-        dim(v)
-        time.sleep(step_s)
+    iv = int(round(pct))
+    if _last_sent_int is not None and iv == _last_sent_int:
+        return  # avoid redundant serial traffic
+    _last_sent_int = iv
+    _writeln(f"SET {iv}")
 
 def dimmer_flicker(duration: float,
                    min_intensity: float,
                    max_intensity: float,
                    flicker_length_min: float,
                    flicker_length_max: float,
-                   in_thread: bool = False):
+                   threaded: bool = False):
     """
-    Smoothly flicker by ramping between random targets in [min_intensity, max_intensity].
-    Each ramp duration is uniform in [flicker_length_min, flicker_length_max].
-    """
-    assert duration > 0
-    assert 0 <= min_intensity <= max_intensity <= 100
-    assert 0 < flicker_length_min <= flicker_length_max
+    Basic flicker effect:
+    Randomly jumps between values in [min_intensity, max_intensity],
+    holding each for a random time in [flicker_length_min, flicker_length_max].
+    Runs for 'duration' seconds.
 
+    Only this effect is interruptible by BreakCheck() or request_stop().
+    """
     def _run():
-        start = time.time()
-        last = _current_pct
-        while not _stop_event.is_set() and (time.time() - start) < duration:
-            seg = random.uniform(flicker_length_min, flicker_length_max)
-            target = random.uniform(min_intensity, max_intensity)
-            target = max(0.0, min(100.0, target))
-            _ramp(last, target, seg, step_s=0.02)
-            last = target
+        start = time.monotonic()
+        while (time.monotonic() - start) < duration:
+            if _stop_event.is_set() or BreakCheck():
+                break
+            value = random.uniform(min_intensity, max_intensity)
+            dim(value)
+            wait = random.uniform(flicker_length_min, flicker_length_max)
+            # Sleep in small slices so we can react quickly to stop/break
+            end_wait = time.monotonic() + wait
+            while time.monotonic() < end_wait:
+                if _stop_event.is_set() or BreakCheck():
+                    return
+                time.sleep(0.02)
 
-    if in_thread:
-        th = threading.Thread(target=_run, daemon=True, name="Dimmer")
-        th.start()
-        return th
+    if threaded:
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
+        return t
     else:
         _run()
-        return None

@@ -18,3 +18,8 @@ def toggleHouseLights(enable: bool = None):
     log_event(f"[Lights] House lights {'ON' if enable else 'OFF'}")
     house.houseLights = enable
     m1Digital_Write(22, 1 if enable else 0)
+    dim.dim(100 if enable else 0)
+    m1Digital_Write(23, 0 if enable else 1)
+    m1Digital_Write(26, 0 if enable else 1)
+    m1Digital_Write(6, 0 if enable else 1) # ship lights ON
+    m1Digital_Write(7, 0 if enable else 1) # ship lights ON

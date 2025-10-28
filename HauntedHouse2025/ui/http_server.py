@@ -150,15 +150,15 @@ class HalloweenHTTP(BaseHTTPRequestHandler):
         elif message == "/ToggleHouseLights":
             toggleHouseLights()
         elif message == "/DemoGangway":
-            demoEvent(f"Demo {gangway.__name__.split('.')[-1]}")
+            demoEvent(gangway.__name__.split('.')[-1])
         elif message == "/DemoTreasureRoom":
-            demoEvent(f"Demo {treasureRoom.__name__.split('.')[-1]}")
+            demoEvent(treasureRoom.__name__.split('.')[-1])
         elif message == "/DemoQuarterdeck":
-            demoEvent(f"Demo {quarterdeck.__name__.split('.')[-1]}")
+            demoEvent(quarterdeck.__name__.split('.')[-1])
         elif message == "/DemoCargoHold":
-            demoEvent(f"Demo {cargoHold.__name__.split('.')[-1]}")
+            demoEvent(cargoHold.__name__.split('.')[-1])
         elif message == "/DemoGraveyard":
-            demoEvent(f"Demo {graveyard.__name__.split('.')[-1]}")
+            demoEvent(graveyard.__name__.split('.')[-1])
 
         self.send_response(200)
         self.send_header("Content-type", "text/html")

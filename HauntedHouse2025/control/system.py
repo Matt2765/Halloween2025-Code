@@ -43,12 +43,13 @@ def initialize_system():
             
         log_event("[System] Initializing non-persistent services...")
 
-        toggleHouseLights(True)
-
         spawn_doors()
 
         t.sleep(0.2)
         house.systemState = "ONLINE"
+
+        toggleHouseLights(True)
+        
         log_event("[System] Initialization complete. System is ONLINE.")
             
         threading.Thread(target=shutdownDetector, daemon=True, name="Shutdown Detector").start()
@@ -79,8 +80,6 @@ def StartHouse():
             daemon=True,
             name=graveyard.__name__.split('.')[-1]
         ).start()
-        
-        t.sleep(5)
 
         threading.Thread(
             target=gangway.run, 
@@ -110,6 +109,8 @@ def StartHouse():
             name=cargoHold.__name__.split('.')[-1]
         ).start()
 
+        shipAmbience()
+
         while house.HouseActive:
             if BreakCheck():
                 break
@@ -121,3 +122,9 @@ def StartHouse():
             log_event("[System] Cannot start house while it is in a shutdown state.")
         else:
             log_event("[System] House is already active. Please stop the house before attemping to re-start it.")
+
+def shipAmbience():
+    log_event("Playing ship ambience in cargoHold, gangway, and quarterdeck.")
+    play_audio("cargoHold", "shipAmbienceCUT.wav", gain=1, looping=True)
+    play_audio("gangway", "shipAmbienceCUT.wav", gain=1, looping=True)
+    play_audio("quarterdeck", "shipAmbienceCUT.wav", gain=1, looping=True)

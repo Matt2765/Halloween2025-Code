@@ -6,10 +6,13 @@ from utils.tools import BreakCheck, log_event
 from control import dimmer_controller as dim
 from control.arduino import m1Digital_Write
 import random, threading
+from control.houseLights import toggleHouseLights
 
 def run():
     log_event("[treasureRoom] Starting...")
     house.TRstate = "ACTIVE"
+
+    m1Digital_Write(3,0) #ambient light
 
     while house.HouseActive or house.Demo:
         log_event("[treasureRoom] Running loop...")
@@ -45,6 +48,7 @@ def run():
             
         if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
             house.Demo = False
+            toggleHouseLights(True)
             break
 
     house.TRstate = "INACTIVE"

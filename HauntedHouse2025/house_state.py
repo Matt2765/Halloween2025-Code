@@ -23,3 +23,4 @@ class HouseState:
         self.laserSequence = False
 
         self.DEBUG_INFO = False
+        self.DEBUG_BREAKCHECK = True

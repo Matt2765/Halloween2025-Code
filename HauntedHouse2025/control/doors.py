@@ -18,19 +18,19 @@ SENSOR_POLL_S            = 0.1
 
 # Time to ignore the TOF after commanding a close (door/frame self-pass)
 # Tune per-door: typical 0.4–0.8s
-DOOR_SELF_PASS_IGNORE_S = {1: 0.60, 2: 0.60}
+DOOR_SELF_PASS_IGNORE_S = {1: 0.5, 2: 0.60}
 
 # Obstruction thresholds + detection profiles
-BLOCK_MM_ENTER   = 1200   # threshold to consider "blocked"
+BLOCK_MM_ENTER   = 1500   # threshold to consider "blocked"
 BLOCK_MM_CLEAR   = 900   # reserved if you later implement explicit hysteresis in rsm
 
 IDLE_WINDOW_MS   = 250   # sensitive when idle
 IDLE_MIN_CONSEC  = 2
 
-MOVING_WINDOW_MS  = 500  # stricter while closing (filters the door edge)
-MOVING_MIN_CONSEC = 3
+MOVING_WINDOW_MS  = 250  # stricter while closing (filters the door edge)
+MOVING_MIN_CONSEC = 2
 
-CLEAR_HOLD_S      = 0.25  # require brief clear before declaring closed
+CLEAR_HOLD_S      = 4  # require brief clear before declaring closed
 
 
 def setDoorState(id, state):

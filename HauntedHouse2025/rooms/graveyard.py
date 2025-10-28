@@ -8,6 +8,8 @@ import threading
 from control.dimmer_controller import dim, dimmer_flicker
 from control.arduino import m1Digital_Write
 from control import cannons
+from control import remote_sensor_monitor as rsm
+from control.houseLights import toggleHouseLights
 
 Scripted_Event = False
 
@@ -16,6 +18,25 @@ def run():
 
     while house.HouseActive or house.Demo:
         log_event("[Graveyard] Running loop...")
+
+        flashingShipLights(10, .5, threaded=False)
+
+        t.sleep(1)
+
+        m1Digital_Write(6, 0) # ship lights ON
+        m1Digital_Write(7, 0)
+
+        '''while True:  #SERVO TESTING ONLY
+            try:
+                angle = float(input("Enter servo angle (0–180, q to quit): "))
+                rsm.servo("SERVO1", angle=angle, ramp_ms=3000)
+            except ValueError:
+                print("Exiting...")
+                break'''
+
+        threading.Thread(target=steeringWheel, daemon=True, name="Steering Wheel").start()
+
+        m1Digital_Write(8, 0) # deck ambient ON
 
         #testEvent()
 
@@ -36,6 +57,7 @@ def run():
 
         if BreakCheck() or house.Demo:  # end on breakCheck or if demo'ing
             house.Demo = False
+            toggleHouseLights(True)
             break
 
     log_event("[Graveyard] Exiting.")
@@ -61,14 +83,14 @@ def BeckettsDeathEvent():
     Scripted_Event = True
     
     log_event("[Graveyard] Beckett's Death Event Starting...")
-    play_audio("graveyard", "GraveyardScene2v2.wav", gain=.1)
+    play_audio("graveyard", "GraveyardScene2v2.wav", gain=.2)
     
     for i in range(58):
         t.sleep(1)
         if BreakCheck():
             return
         
-    play_audio("graveyard", "CannonDesigned_2.wav", gain=1)
+    cannons.fire_cannon(3)
     
     for i in range(5):
         t.sleep(1)
@@ -112,10 +134,12 @@ def MedallionCallsEvent():
         t.sleep(1)
         if BreakCheck():
             return
-        
+    
     play_audio("graveyard", "waterWave01.wav", gain=.7)
     t.sleep(.8)
-    play_audio("graveyard", "impactDebris01.wav", gain=.7)
+    flickerAmbientLights(12, threaded=True)
+    m1Digital_Write(43, 0) # mast
+    play_audio("graveyard", "impactDebris01.wav", gain=.5)
         
     for i in range(8):  # 28.8
         t.sleep(1)
@@ -141,16 +165,23 @@ def MedallionCallsEvent():
         t.sleep(1)
         if BreakCheck():
             return
-        
+    
+    flickerAmbientLights(4, threaded=True)
     play_audio("graveyard", "waterWave02.wav", gain=1)
     t.sleep(.6)
-    play_audio("graveyard", "impactDebris04.wav", gain=1)
+    play_audio("graveyard", "impactDebris04.wav", gain=.5)
+    flickerAmbientLights(6, threaded=False)
+    m1Digital_Write(8, 1) # ambient OFF
     
     t.sleep(.2)
+
+    dimmer_flicker(6, 20, 100, 0.05, 0.18, True)  # fire lights flicker
     for i in range(7):  # 49
         t.sleep(1)
         if BreakCheck():
             return
+        
+    dimmer_flicker(58, 20, 100, 0.05, 0.18, True)  # fire lights flicker
         
     cannons.fire_cannon(1)
     for i in range(6):  # 55
@@ -183,16 +214,21 @@ def MedallionCallsEvent():
         t.sleep(1)
         if BreakCheck():
             return
+        
+    flashingShipLights(20, .5, threaded=True)
+
     cannons.fire_cannon(1)
     
     for i in range(8):  # 77
         t.sleep(1)
         if BreakCheck():
             return
-        
+
     play_audio("graveyard", "waterWave03.wav", gain=1)
     t.sleep(.5)
-    play_audio("graveyard", "impactDebris03.wav", gain=1)
+    play_audio("graveyard", "impactDebris03.wav", gain=.5)
+    flickerAmbientLights(6, threaded=False)
+    m1Digital_Write(8, 1) # ambient OFF
     
     for i in range(10):  # 87
         t.sleep(1)
@@ -214,6 +250,53 @@ def MedallionCallsEvent():
     log_event("[Graveyard] Medallion Calls Event Ending...")
     Scripted_Event = False
 
+def flashingShipLights(duration, delay_s, threaded=False):
+    def main():
+        log_event(f"[Graveyard] Flashing Ship Lights for {duration} seconds")
+        end_time = t.time() + duration
+        while t.time() < end_time and house.HouseActive:
+            m1Digital_Write(6, 1) # ship lights
+            m1Digital_Write(7, 0)
+            t.sleep(delay_s - 0.3)
+            m1Digital_Write(6, 0) # ship lights
+            t.sleep(0.3)
+            m1Digital_Write(7, 1)
+            t.sleep(delay_s)
+            if BreakCheck():    
+                return
+        m1Digital_Write(6, 0) # ship lights ON
+        m1Digital_Write(7, 0)
+
+    if threaded:
+        threading.Thread(target=main, daemon=True, name="Ship Light Flasher").start()
+    else:
+        main()
+
+def flickerAmbientLights(loops, threaded=False):
+    def main():
+        log_event(f"[Graveyard] Flickering Ambient Lights {loops} times")
+        for i in range(loops):
+            m1Digital_Write(8, 1) # deck ambient OFF
+            t.sleep(random.uniform(.05, .12))
+            m1Digital_Write(8, 0) # deck ambient ON
+            t.sleep(random.uniform(.05, .12))
+            if BreakCheck():    
+                return
+
+    if threaded:
+        threading.Thread(target=main, daemon=True, name="Graveyard Ambient Flicker").start()
+    else:
+        main()
+
+def steeringWheel():
+    rsm.servo("SERVO1",angle=5,ramp_ms=3000)
+    t.sleep(4)
+    if BreakCheck():
+        return
+    rsm.servo("SERVO1",angle=85,ramp_ms=3000)
+    t.sleep(4)
+    if BreakCheck():    
+        return
 
 def randAttackerCannons():
     audioFiles = [
@@ -248,85 +331,13 @@ def testEvent():
 
     t.sleep(1)
 
-    dimmer_flicker(     # ambient lights flicker
-        channel=1,
-        duration_s=10, 
-        intensity_min=45, 
-        intensity_max=70, 
-        flicker_length_min=0.1, 
-        flicker_length_max=0.5
-    )
-
-    dimmer_flicker(     # ambient lights flicker
-        channel=2,
-        duration_s=10, 
-        intensity_min=45, 
-        intensity_max=70, 
-        flicker_length_min=0.1, 
-        flicker_length_max=0.5
-    )
-
-    '''dimmer_flicker(     # ambient lights flicker
-        channel=2,
-        duration_s=10, 
-        intensity_min=45, 
-        intensity_max=70, 
-        flicker_length_min=0.1, 
-        flicker_length_max=0.5
-    )'''
-
-    #t.sleep(10)
-
-    '''dimmer(1, 35)  # Treasure room lights (remove later)
-    t.sleep(2)
-    dimmer(2, 100)  # Fire lights
-    t.sleep(2)
-    #m1Digital_Write(32, 0)  # Deck strobe
-    #m1Digital_Write(29, 0)  # Deck lightning
-    dimmer(7, 100)  # Ambient lights
-    t.sleep(2)
-    dimmer(1, 100)  # Treasure room lights (remove later)
-    t.sleep(2)
-    dimmer(1, 50)  # Treasure room lights (remove later)
-
-    t.sleep(2)
-    dimmer(2, 75)  # Fire lights
-    t.sleep(2)
-    #m1Digital_Write(32, 0)  # Deck strobe
-    #m1Digital_Write(29, 0)  # Deck lightning
-    dimmer(7, 50)  # Ambient lights
-    t.sleep(2)
-    while True:
-        dimmer(1, 100)  # Treasure room lights (remove later)
-        t.sleep(2)
-        dimmer(1, 75)  # Treasure room lights (remove later)
-        t.sleep(2)
-        dimmer(1, 70)  # Treasure room lights (remove later)
-        t.sleep(2)
-        dimmer(1, 67)  # Treasure room lights (remove later)
-        t.sleep(2)'''
-
-    return
-
-
     for i in range(5):
         t.sleep(1)
         if BreakCheck():
             return
         
-    dimmer(2, 0)  # Fire lights
     m1Digital_Write(32, 1)  # Deck strobe
     m1Digital_Write(29, 1)  # Deck lightning
-    dimmer(7, 0)  # Ambient lights
-        
-    dimmer_flicker(     # ambient lights flicker
-        channel=7,
-        duration_s=10, 
-        intensity_min=45, 
-        intensity_max=70, 
-        flicker_length_min=0.1, 
-        flicker_length_max=0.5
-    )
 
     for i in range(10):
         t.sleep(1)
@@ -401,8 +412,6 @@ def testEvent():
         t.sleep(1)
         if BreakCheck():
             return
-        
-    dimmer(7,0)  # Ambient lights OFF
 
     dimmer_flicker(     # fire lights flicker
         channel=2,

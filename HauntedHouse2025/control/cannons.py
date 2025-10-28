@@ -30,6 +30,11 @@ audioFiles = [
         "CannonDesigned_4.wav"
     ]
 
+interior_audioFiles = [
+        "CannonFireInterior_1.wav",
+        "CannonFireInterior_2.wav"
+    ]
+
 def fire_cannon(cannon_id:int):
     def main():
         """Fires the specified cannon by activating its solenoid, light, and smoke effects."""
@@ -52,7 +57,11 @@ def fire_cannon(cannon_id:int):
         t.sleep(.1)  # Brief delay before firing
 
         audio = random.choice(audioFiles)
+        interiorAudio = random.choice(interior_audioFiles)
         play_audio("graveyard", audio, gain=1)
+        play_audio("cargoHold", interiorAudio, gain=1)
+        play_audio("quarterdeck", interiorAudio, gain=1)
+        play_audio("gangway", interiorAudio, gain=1)
 
         # Activate light
         m1Digital_Write(light_pin, 0)
