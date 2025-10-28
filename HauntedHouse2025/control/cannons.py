@@ -81,4 +81,4 @@ def fire_cannon(cannon_id:int):
         m1Digital_Write(solenoid_pin, 1)
         log_event(f"[cannons] Deactivated solenoid for cannon {cannon_id}")
 
-    threading.Thread(target=main, daemon=True).start()
+    threading.Thread(target=main, daemon=True, name=f"Cannon {cannon_id}").start()

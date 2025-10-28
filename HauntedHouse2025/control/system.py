@@ -34,8 +34,8 @@ def initialize_system():
             shutdown()
 
             # Launch core services
-            threading.Thread(target=HTTP_SERVER, daemon=True).start()
-            threading.Thread(target=MainGUI, daemon=True).start()
+            threading.Thread(target=HTTP_SERVER, daemon=True, name="HTTP SERVER").start()
+            threading.Thread(target=MainGUI, daemon=True, name="GUI").start()
             
             remote_sensor_monitor.init(port="COM6", baud=921600)
 
@@ -51,7 +51,7 @@ def initialize_system():
         house.systemState = "ONLINE"
         log_event("[System] Initialization complete. System is ONLINE.")
             
-        threading.Thread(target=shutdownDetector, daemon=True).start()
+        threading.Thread(target=shutdownDetector, daemon=True, name="Shutdown Detector").start()
         
         t.sleep(1)
         
@@ -77,7 +77,7 @@ def StartHouse():
             target=graveyard.run, 
             args=(), 
             daemon=True,
-            name="graveyard"
+            name=graveyard.__name__.split('.')[-1]
         ).start()
         
         t.sleep(5)
@@ -86,35 +86,34 @@ def StartHouse():
             target=gangway.run, 
             args=(), 
             daemon=True, 
-            name="gangway"
+            name=gangway.__name__.split('.')[-1]
         ).start()
         
         threading.Thread(
             target=treasureRoom.run, 
             args=(), 
             daemon=True, 
-            name="treasureRoom"
+            name=treasureRoom.__name__.split('.')[-1]
         ).start()
         
         threading.Thread(
             target=quarterdeck.run, 
             args=(), 
             daemon=True, 
-            name="quarterdeck"
+            name=quarterdeck.__name__.split('.')[-1]
         ).start()
         
         threading.Thread(
             target=cargoHold.run, 
             args=(), 
             daemon=True, 
-            name="cargoHold"
+            name=cargoHold.__name__.split('.')[-1]
         ).start()
 
         while house.HouseActive:
             if BreakCheck():
-                t.sleep(2)
                 break
-            t.sleep(5)
+            t.sleep(.1)
 
         log_event("[System] Main sequence ended.")
     else:

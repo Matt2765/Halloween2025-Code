@@ -75,7 +75,7 @@ def BeckettsDeathEvent():
         if BreakCheck():
             return
     
-    threading.Thread(target=randCannons, daemon=True).start()
+    threading.Thread(target=randCannons, daemon=True, name="rand cannons initiator").start()
     
     for i in range(288):
         t.sleep(1)
@@ -99,7 +99,7 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
             
-    threading.Thread(target=randAttackerCannons, daemon=True).start()
+    threading.Thread(target=randAttackerCannons, daemon=True, name="randAttackerCannons").start()
 
     for i in range(1):  # 22
         t.sleep(1)
@@ -333,7 +333,7 @@ def testEvent():
         if BreakCheck():
             return
         
-    threading.Thread(target=lightning_bolt, daemon=True).start()
+    threading.Thread(target=lightning_bolt, daemon=True, name="GY Lightning Bolt").start()
         
     dimmer_flicker(     # ambient lights flicker
         channel=7,
@@ -363,7 +363,7 @@ def testEvent():
         if BreakCheck():
             return
 
-    threading.Thread(target=lightning_bolt, daemon=True).start()
+    threading.Thread(target=lightning_bolt, daemon=True, name="GY Lightning Bolt").start()
 
     dimmer_flicker(     # ambient lights flicker
         channel=7,

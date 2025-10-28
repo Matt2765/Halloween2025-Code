@@ -84,7 +84,7 @@ def dimmer_flicker(duration: float,
             last = target
 
     if in_thread:
-        th = threading.Thread(target=_run, daemon=True)
+        th = threading.Thread(target=_run, daemon=True, name="Dimmer")
         th.start()
         return th
     else:

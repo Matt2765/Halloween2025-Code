@@ -43,7 +43,7 @@ def shutdown():
     m1Digital_Write(9,  1); log_event("+120v Strobe 2 (F) OFF")           # NEW: D9
     m1Digital_Write(23, 1); log_event("+120v Lightning (B) OFF")
     m1Digital_Write(53, 1); log_event("+12v Prisoner Arms (F) OFF")
-    m1Digital_Write(38, 1); log_event("+12v Door 2, Solenoid F OFF")
+    m1Digital_Write(38, 1); log_event("+12v Door 2, Solenoid (F) OFF")
     m1Digital_Write(4,  1); log_event("+120v Drop Down Light (B) OFF")    # D4
 
     # ---------------- Graveyard ----------------

@@ -1,4 +1,4 @@
-# rooms/swamp.py
+# rooms/quarterdeck.py
 import time as t
 from context import house
 from control.audio_manager import play_audio
@@ -10,11 +10,11 @@ import random
 from control import remote_sensor_monitor as rsm
 
 def run():
-    log_event("[SwampRoom] Starting...")
+    log_event("[Quaterdeck] Starting...")
     house.SRstate = "ACTIVE"
 
     while house.HouseActive or house.Demo:
-        log_event("[SwampRoom] Running loop...")
+        log_event("[Quaterdeck] Running loop...")
 
         #m1Digital_Write(23, 0) #lightning
 
@@ -22,11 +22,10 @@ def run():
 
         #m1Digital_Write(9, 0) #strobe
 
-        while not rsm.obstructed("TOF2", block_mm=1000, window_ms=250, min_consecutive=2):
-            for i in range(1):
-                if BreakCheck():
-                    return
-                t.sleep(1)
+        while not rsm.obstructed("TOF2", block_mm=2500, window_ms=250, min_consecutive=2):
+            if BreakCheck():
+                return
+            t.sleep(.05)
 
         lightning(
             23, 
@@ -42,7 +41,7 @@ def run():
             break
 
     house.SRstate = "INACTIVE"
-    log_event("[SwampRoom] Exiting.")
+    log_event("[Quaterdeck] Exiting.")
 
 def lightning(pin: int, flash_ms: int = 100, flashes: range = (1, 3), delay_ms: int = 80, loops: int = 1, loop_delay_range: range = (1, 3), threaded: bool = True):
     """

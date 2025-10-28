@@ -1,50 +1,261 @@
 # remote_sensor_monitor.py
 # =============================================================================
-# QUICK CHEAT SHEET (read this first)
-#
-# WHAT THIS MODULE DOES
-# - Starts a background process that reads NDJSON lines from your receiver ESP32
-#   over USB serial and maintains a live, shared table of latest sensor values
-#   keyed by sensor id (e.g., "TOF1", "BTN3", "Multi_BTN1").
-# - Supports TOF distance (unchanged), AND button packets emitted by receiver
-#   as normalized JSON: {"type":"button","id":"...","btn":N,"pressed":true/false,"seq":...}.
-# - Provides a tiny button event FIFO (optional) for edge-triggered logic.
-# - Lets your Python send commands OUT to ESP32 nodes via the same USB serial:
-#     tx_broadcast({"to":"Skull1","cmd":"start"})
-#     tx_to_id("ServoBox1", {"cmd":"goto","deg":75})
-#     tx_to_mac("24:6F:28:AA:BB:CC", {"cmd":"stop"})
-#
-# TYPICAL USE
-#   import remote_sensor_monitor as rsm
-#   rsm.init(port=None, baud=921600)    # start once at boot
-#   # read TOF:
-#   d = rsm.get_value("TOF1","dist_mm")
-#   # read buttons:
-#   evt = rsm.button_pop(timeout=0.0)   # or poll pressed state via get_value("BTN3","pressed")
-#   # send commands:
-#   rsm.tx_broadcast({"to":"Skull1","cmd":"start"})
-#
-# CORE FUNCTIONS (existing, unchanged)
-# - init(port=None, baud=921600)           -- starts background reader/writer
-# - get(sensor_id) -> latest dict or None  -- latest row for that id
-# - get_value(sensor_id, key, default=None, max_age_ms=250)
-# - get_latency_ms(sensor_id)
-# - print_table(), format_table(), snapshot()
-#
-# NEW TX API
-# - tx_broadcast(payload_dict_or_str)      -- sends: TXB <JSON>\n (broadcast)
-# - tx_to_id(device_id, payload)           -- sends: TX <ID> <JSON>\n (unicast)
-# - tx_to_mac(mac, payload)                -- sends: TXMAC <mac> <JSON>\n (unicast)
-#
-# BUTTON EVENTS API (optional)
-# - button_pop(timeout=0.0) -> dict|None   -- {"id": "...", "btn": N, "pressed": bool, "seq": int, "t_host_ms": int}
-#   (Use if you want edge-triggered behavior instead of sampling state.)
-#
-# CHANGELOG
-# - 2025-10-27: Interpret negative TOF readings (e.g., -1) as FAR distance
-#               (configurable via set_far_distance_mm()). Prevents false
-#               obstruction triggers when sensor cannot see a target.
+# REMOTE SENSOR MONITOR — OPERATION MANUAL
 # =============================================================================
+# OVERVIEW
+# This module launches a background *process* that talks to your ESP32 receiver
+# over USB serial. The receiver streams newline-delimited JSON (NDJSON). Each
+# line contains a normalized "data" object representing one sensor update
+# (e.g., TOF distance) or a button edge (for multi-button boards).
+#
+# The child process parses each line and writes the *latest* record per sensor
+# into a cross-process shared dict, keyed by sensor id (e.g., "TOF1", "TOF2",
+# "BTN3", "Multi_BTN1"). In the main process, you read from this shared table
+# with get()/get_value(), or use higher-level helpers like obstructed().
+#
+# Additionally, the module exposes a PC→receiver transmit path (TX) for sending
+# JSON commands back out over ESP-NOW: broadcast, by device ID, or by MAC.
+#
+# -----------------------------------------------------------------------------
+# QUICK START
+# -----------------------------------------------------------------------------
+# 1) Start it once during program boot:
+#
+#     import remote_sensor_monitor as rsm
+#     rsm.init(port=None, baud=921600)   # port=None => auto-detect
+#     # (Optional) small pause to allow first packets to land:
+#     import time; time.sleep(0.2)
+#
+# 2) Read a TOF value (stateless sampling):
+#
+#     d = rsm.get_value("TOF2", "dist_mm")   # returns int distance or None
+#     if d is not None and d < 1000:
+#         print("Blocked!")
+#
+# 3) Use a *stateful* predicate with windowing (debounced “blocked”):
+#
+#     # Important timing note: obstructed() needs ≥ min_consecutive samples
+#     # inside window_ms. Poll fast enough or make window_ms large enough
+#     # to contain those samples. See “TIMING & WINDOWING” below.
+#     while not rsm.obstructed("TOF2", block_mm=1000, window_ms=600, min_consecutive=2):
+#         if BreakCheck(): break
+#         time.sleep(0.05)   # ~20 Hz polling (typical)
+#     print("TOF2 obstructed")
+#
+# 4) Print a live table for debugging:
+#
+#     print(rsm.format_table())
+#
+# 5) Send commands out via the receiver (ESP-NOW):
+#
+#     rsm.tx_broadcast({"to":"Skull1","cmd":"start"})
+#     rsm.tx_to_id("ServoBox1", {"cmd":"goto","deg":75})
+#     rsm.tx_to_mac("24:6F:28:AA:BB:CC", {"cmd":"stop"})
+#
+# 6) Read button edges (optional event FIFO):
+#
+#     evt = rsm.button_pop(timeout=0.0)
+#     if evt:
+#         # evt = {"id": "...", "btn": int, "pressed": bool, "seq": int, "t_host_ms": int, "mac": str}
+#         print("Button:", evt)
+#
+# 7) Move a servo (convenience helper):
+#
+#     rsm.servo("SERVO1", 120)                # immediate move
+#     rsm.servo("SERVO1", 45, ramp_ms=800)    # smooth ramp over 800 ms
+#
+# The helper emits (via receiver -> ESP-NOW):
+#     {"id":"<SERVO_ID>","angle":<deg>[,"ramp_ms":<ms>]}
+#
+# Persistent default on the node (see servo firmware):
+#     rsm.tx_to_id("SERVO1", {"id":"SERVO1","set_default":135})
+#
+# -----------------------------------------------------------------------------
+# DATA MODEL (SHARED TABLE)
+# -----------------------------------------------------------------------------
+# Each sensor id maps to the *latest* record:
+#
+#   {
+#     "id": "TOF2",              # sensor/device id string
+#     "seq": 1234,               # sender sequence number (if provided)
+#     "t_send_ms": 12345678,     # device timestamp (if provided)
+#     "t_rx_ms":   12345890,     # receiver-side timestamp (from the ESP32)
+#     "t_host_ms": 12345900,     # host-side receipt timestamp (monotonic ms)
+#     "mac": "AA:BB:..",         # sender MAC (if known)
+#     "vals": {
+#       # For TOF:
+#       "dist_mm": 742,          # distance in millimeters (int-coerced; see FAR mapping)
+#       "status": 0              # optional sensor status, if your firmware sends it
+#       # For buttons:
+#       "btn": 1,                # button index (1-based)
+#       "pressed": true          # True on press edge, False on release edge
+#     }
+#   }
+#
+# Use get_value(sid, "dist_mm") for distances; for buttons use "pressed" or
+# consume edges via button_pop() (preferred for edge-triggered logic).
+#
+# -----------------------------------------------------------------------------
+# API REFERENCE (MOST USED)
+# -----------------------------------------------------------------------------
+# init(port: Optional[str]=None, baud: int=921600) -> None
+#     Starts the background process, the shared table, and TX queues. Idempotent.
+#     - port=None: attempt auto-detection (uses common USB-UART descriptors).
+#
+# get(sensor_id: str) -> Optional[dict]
+#     Returns the latest raw record (or None if unknown).
+#
+# get_value(sensor_id: str, key: str, default: Any=None, max_age_ms: Optional[int]=250) -> Any
+#     Returns vals[key] from the latest record, enforcing staleness via max_age_ms.
+#     If data is too old (or missing), returns default. Special case for "dist_mm":
+#       negatives (e.g., -1) are *coerced to FAR_DISTANCE_MM* to represent “very far”.
+#
+# get_latency_ms(sensor_id: str) -> Optional[int]
+#     If the sender provides t_send_ms and the receiver provides t_rx_ms, returns
+#     (t_rx_ms - t_send_ms); otherwise None. This is *device→receiver* latency.
+#
+# format_table() / print_table()
+#     Pretty table for current snapshot (id, value, age_ms, lat_ms, MAC, seq).
+#
+# snapshot() -> Dict[str, dict]
+#     Shallow copy of the shared table (safe to iterate in UI/loggers).
+#
+# set_far_distance_mm(value: int) -> None
+#     Sets the synthetic distance used when a TOF reports a negative number (e.g., -1).
+#     Default is 10000 mm (treated as “clear/very far”).
+#
+# button_pop(timeout: float=0.0) -> Optional[dict]
+#     Pops the next *edge* event from a small in-memory FIFO (max ~256). Returns
+#     None on timeout/empty. Best for reacting to press/release transitions.
+#
+# obstructed(
+#     sid: str,
+#     block_mm: int,
+#     clear_mm: Optional[int]=None,
+#     window_ms: int=250,
+#     min_consecutive: int=2,
+#     ignore_neg1: bool=True,
+#     require_status_zero: bool=False
+# ) -> bool
+#     Debounced obstruction detector. Returns True iff the most recent history
+#     contains ≥ min_consecutive samples < block_mm. Once True, it *latches*
+#     until a sample > clear_mm (default = block_mm + 50). Uses an internal
+#     per-sensor deque populated by calls into rsm (see TIMING below).
+#
+# get_distance_filtered(
+#     sid: str,
+#     window_ms: int=250,
+#     min_samples: int=3,
+#     ignore_neg1: bool=True,
+#     require_status_zero: bool=False,
+#     method: str="median"
+# ) -> Optional[float]
+#     Rolling window filter (median/mean) over the recent sample deque. Returns
+#     None until enough samples are accumulated.
+#
+# TX HELPERS (PC → receiver → ESP-NOW)
+#   tx_broadcast(payload: Union[str, dict]) -> None         #  emits: "TXB <JSON>\n"
+#   tx_to_id(device_id: str, payload: Union[str, dict]) -> None   # "TX <ID> <JSON>\n"
+#   tx_to_mac(mac: str, payload: Union[str, dict]) -> None        # "TXMAC <mac> <JSON>\n"
+# Payloads may be dicts (JSON encoded) or pre-encoded JSON strings.
+#
+# servo(device_id: str, angle: int, ramp_ms: Optional[int]=None) -> None
+#     Convenience wrapper around tx_to_id() for ESP-NOW servo nodes.
+#     - angle is clamped to 0..180
+#     - when ramp_ms is provided (>=0), it’s included as "ramp_ms" in the payload
+#
+# -----------------------------------------------------------------------------
+# TIMING & WINDOWING (IMPORTANT)
+# -----------------------------------------------------------------------------
+# • The internal history deque that powers obstructed() and get_distance_filtered()
+#   is populated each time you *call* into the module (e.g., obstructed(), get_*()).
+#   Therefore, your polling cadence controls how many samples land inside window_ms.
+#
+# • To reliably trigger obstructed(sid, block_mm, window_ms, min_consecutive):
+#     1) Ensure the sender publishes frequently enough (e.g., ≥ 10 Hz).
+#     2) Poll rsm.obstructed() fast enough OR make window_ms large enough so that
+#        ≥ min_consecutive fresh samples fall into the window.
+#
+#   Example good loop for 10 Hz sender:
+#       while not rsm.obstructed("TOF2", block_mm=1000, window_ms=600, min_consecutive=2):
+#           if BreakCheck(): break
+#           time.sleep(0.05)  # 20 Hz polling (window contains ≥ 2 updates)
+#
+#   Example with slow polling (1 second):
+#       # Either relax min_consecutive OR enlarge window to exceed your sleep:
+#       while not rsm.obstructed("TOF2", block_mm=1000, window_ms=2500, min_consecutive=2):
+#           time.sleep(1)
+#
+# • If you only need a simple threshold without debounce/latching, prefer stateless:
+#       d = rsm.get_value("TOF2","dist_mm")
+#       if d is not None and d < 1000: break
+#
+# -----------------------------------------------------------------------------
+# NEGATIVE DISTANCES & FAR MAPPING
+# -----------------------------------------------------------------------------
+# • By default, any negative "dist_mm" from the device (e.g., -1 meaning “no target”)
+#   is *coerced* to FAR_DISTANCE_MM (default 10000 mm). This prevents spurious
+#   obstruction triggers when the sensor has no valid reading.
+#
+# • If your hardware uses -1 to indicate *blocked/too close*, you can either:
+#     - Set FAR distance to 0 globally (blunt, not recommended):
+#           rsm.set_far_distance_mm(0)
+#     - Or modify _get_dist_sample() to treat negatives as 0 when ignore_neg1=False,
+#       then call obstructed(..., ignore_neg1=False). (This manual keeps the code as-is.)
+#
+# -----------------------------------------------------------------------------
+# BUTTONS
+# -----------------------------------------------------------------------------
+# • The receiver should normalize button events to:
+#     {"type":"button","id":"Multi_BTN1","btn":1,"pressed":true/false,"seq":N}
+#
+# • Latest state is in the shared table under that id; for edge-driven logic use:
+#     evt = rsm.button_pop(timeout=0.0)
+#     if evt and evt["pressed"]:
+#         # handle press edge
+#
+# -----------------------------------------------------------------------------
+# CLI / MANUAL DIAGNOSTICS
+# -----------------------------------------------------------------------------
+# Run the file directly:
+#     python remote_sensor_monitor.py --watch 2 --baud 921600 --port COM5
+# You’ll see a live table updating ~2 Hz. Press Ctrl+C to quit.
+#
+# -----------------------------------------------------------------------------
+# THREADING / MULTIPROCESS NOTES
+# -----------------------------------------------------------------------------
+# • The reader runs in a separate *process* (multiprocessing.Process, daemon=True).
+# • Cross-process state:
+#     - _shared: Manager().dict() for latest records.
+#     - _btnq:   mp.Queue() for button edges.
+#     - _txq:    mp.Queue() for PC→receiver commands.
+# • Call stop() on shutdown if you need a clean exit (init() auto-registers atexit).
+#
+# -----------------------------------------------------------------------------
+# PERFORMANCE TIPS
+# -----------------------------------------------------------------------------
+# • Leave baud at 921600 for high-rate multi-sensor rigs.
+# • On Windows, USB serial drivers sometimes “pause”; the child auto-reconnects
+#   after SILENCE_RECONNECT_MS (default 2000 ms) of no bytes.
+# • Avoid heavy prints inside tight loops; use format_table() intermittently.
+#
+# -----------------------------------------------------------------------------
+# COMMON PITFALLS (CHECKLIST)
+# -----------------------------------------------------------------------------
+# [ ] Forgot rsm.init() before using the APIs.
+# [ ] Sensor id typo ("TOF2" vs "TOF02").
+# [ ] Polling too slowly for obstructed(min_consecutive>1, small window_ms).
+# [ ] block_mm doesn’t match the physical geometry (target never < threshold).
+# [ ] Expecting -1 to mean “blocked” even though it's mapped to FAR by default.
+# [ ] max_age_ms in get_value() filters out stale values (returns default).
+# [ ] Receiver not detected; pass an explicit --port or init(port="COMx").
+#
+# -----------------------------------------------------------------------------
+# COPYRIGHT / LICENSE
+# -----------------------------------------------------------------------------
+# You own your project; keep/adjust this header as needed for your docs.
+# =============================================================================
+
 
 from __future__ import annotations
 import json, time, sys, atexit, argparse, os, queue
@@ -223,7 +434,17 @@ def _monitor_main(shared: "dict[str, dict]", port: Optional[str], baud: int,
                                 continue
                             seq   = int(data.get("seq", 0))
                             t_send= int(data.get("t", 0))
-                            vals  = data.get("vals") or {}
+                            vals = data.get("vals") or {}
+                            # ---- NEW: accept flat JSON (no "vals" wrapper) ----
+                            if not vals and isinstance(data, dict):
+                                for k in ("dist_mm", "status", "angle", "target", "default", "ramp_ms", "pos", "pos_deg"):
+                                    if k in data:
+                                        vals[k] = data[k]
+                            # Optional: normalize common synonyms to "angle"
+                            if "angle" not in vals:
+                                if "pos_deg" in vals: vals["angle"] = vals["pos_deg"]
+                                elif "pos" in vals:   vals["angle"] = vals["pos"]
+
                             shared[sid] = {
                                 "id": sid,
                                 "seq": seq,
@@ -233,6 +454,7 @@ def _monitor_main(shared: "dict[str, dict]", port: Optional[str], baud: int,
                                 "mac": mac,
                                 "vals": vals,
                             }
+
                         except Exception:
                             pass
                 if (_now_ms() - last_byte_ms) > SILENCE_RECONNECT_MS:
@@ -331,6 +553,40 @@ def tx_to_mac(mac: str, payload: Union[str, dict]) -> None:
     """Unicast to a MAC: 'TXMAC <mac> <JSON>\\n'."""
     if not _txq: raise RuntimeError("call init() first")
     _txq.put(('TXMAC', mac, _json_str(payload)))
+
+# ---------- High-level convenience: servo control ----------
+def servo(device_id: str, angle: int, ramp_ms: Optional[int] = None) -> None:
+    """
+    Move an ESP-NOW servo node.
+
+    Example:
+        servo("SERVO1", 120)              # immediate
+        servo("SERVO1", 45, ramp_ms=800)  # smooth 800 ms ramp
+
+    Payload format (what the receiver sends over ESP-NOW):
+        {"id":"<device_id>","angle":<deg>[,"ramp_ms":<ms>]}
+    """
+    if not isinstance(device_id, str) or not device_id:
+        raise ValueError("servo(): 'device_id' must be a non-empty string")
+    try:
+        deg = int(angle)
+    except Exception:
+        raise ValueError("servo(): 'angle' must be an integer (degrees 0..180)")
+    # Clamp to valid range expected by the node
+    if   deg < 0:   deg = 0
+    elif deg > 180: deg = 180
+
+    payload = {"id": device_id, "angle": deg}
+    if ramp_ms is not None:
+        try:
+            r = int(ramp_ms)
+        except Exception:
+            raise ValueError("servo(): 'ramp_ms' must be an integer (milliseconds)")
+        if r < 0:
+            r = 0
+        payload["ramp_ms"] = r
+
+    tx_to_id(device_id, payload)
 
 # ---------- Snapshot / formatting / watch ----------
 def snapshot() -> Dict[str, dict]:

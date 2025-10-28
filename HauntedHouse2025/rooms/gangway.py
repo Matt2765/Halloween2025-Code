@@ -13,19 +13,10 @@ def run():
     house.TRstate = "ACTIVE"
     try:
         while house.HouseActive or house.Demo:
-            if rsm.obstructed("TOF1", block_mm=800, window_ms=250, min_consecutive=2) or house.Demo:
-                print("TRIPPED")
-                play_audio("gangway sensor tripped")
-                setDoorState(1, "CLOPEN")
-                m1Digital_Write(27, 1)  # Start animatronic
-                log_event("[gangway] Activated animatronic 27")
-                t.sleep(5)
-                m1Digital_Write(27, 0)
-                log_event("[gangway] Deactivated animatronic 27")
-                setDoorState(1, "CLOSED")
+            t.sleep(1)
 
-                if house.Demo:
-                    break
+            if house.Demo:
+                break
 
             if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
                 house.Demo = False

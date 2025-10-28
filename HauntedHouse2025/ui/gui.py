@@ -49,7 +49,7 @@ def MainGUI():
     tk.Label(root, text="ADVANCED CONTROLS", font=("Helvetica bold", 15), bg="orange").place(x=25, y=535)
 
     tk.Button(root, text="START HAUNTED HOUSE", height=3, width=25, bg="turquoise1",
-              command=lambda: threading.Thread(target=StartHouse, daemon=True).start()).place(x=250, y=50)
+              command=lambda: threading.Thread(target=StartHouse, daemon=True, name="HOUSE").start()).place(x=250, y=50)
     tk.Button(root, text="EMERGENCY SHUTOFF", height=3, width=25, bg="red",
               command=lambda: change_system_state("EmergencyShutoff")).place(x=25, y=50)
     tk.Button(root, text="SOFT SHUTDOWN", height=3, width=25, bg="yellow",
@@ -81,49 +81,77 @@ def MainGUI():
               command=toggleHouseLights).place(x=250, y=125)
 
     # -------------------------------------------------------------------------
-    # NEW: SENSOR + BUTTON STATUS PANEL (bottom section)
+    # NEW: SENSOR + BUTTON STATUS PANEL (fits 465px width)
     # -------------------------------------------------------------------------
     SECTION_Y = 640
     tk.Label(root, text="SENSORS & BUTTONS", font=("Helvetica bold", 15), bg="orange").place(x=25, y=SECTION_Y)
 
-    # ----- TOF sensors (TOF1..TOF5)
+    panel = tk.Frame(root, bg="orange")
+    panel.place(x=25, y=SECTION_Y + 30, width=415)  # <= keep within window
+
+    small = ("Helvetica", 11)
+
+    # ===== Row group 1: TOF (left) + Buttons (right) =====
+    row1 = tk.Frame(panel, bg="orange")
+    row1.grid(row=0, column=0, sticky="nw")
+
+    # TOF table
+    tof_frame = tk.Frame(row1, bg="orange")
+    tof_frame.grid(row=0, column=0, sticky="nw", padx=(0, 14))
+    tk.Label(tof_frame, text="TOF", font=small, bg="orange").grid(row=0, column=0, sticky="w", padx=(0, 10))
+    tk.Label(tof_frame, text="Dist", font=small, bg="orange").grid(row=0, column=1, sticky="w")
+
     tof_ids = ["TOF1", "TOF2", "TOF3", "TOF4", "TOF5"]
     tof_labels = {}
-    base_y = SECTION_Y + 35
-    for i, sid in enumerate(tof_ids):
-        row_y = base_y + i * 32
-        tk.Label(root, text=sid, font=("Helvetica", 12), bg="orange").place(x=25, y=row_y)
-        lbl = tk.Label(root, text="0 mm", font=("Helvetica", 12), bg="orange")
-        lbl.place(x=100, y=row_y)
+    for i, sid in enumerate(tof_ids, start=1):
+        tk.Label(tof_frame, text=sid, font=small, bg="orange").grid(row=i, column=0, sticky="w", padx=(0, 10))
+        lbl = tk.Label(tof_frame, text="0 mm", font=small, bg="orange")
+        lbl.grid(row=i, column=1, sticky="w")
         tof_labels[sid] = lbl
 
-    # ----- Single-button boxes (BTN1..BTN4)
+    # Buttons table
+    btn_frame = tk.Frame(row1, bg="orange")
+    btn_frame.grid(row=0, column=1, sticky="nw")
+    tk.Label(btn_frame, text="Buttons", font=small, bg="orange").grid(row=0, column=0, columnspan=2, sticky="w")
+
     btn_ids = ["BTN1", "BTN2", "BTN3", "BTN4"]
     btn_labels = {}
     btn_states = {sid: False for sid in btn_ids}
-    btn_y = base_y
-    for i, sid in enumerate(btn_ids):
-        row_y = btn_y + i * 32
-        tk.Label(root, text=sid, font=("Helvetica", 12), bg="orange").place(x=220, y=row_y)
-        lbl = tk.Label(root, text="False", font=("Helvetica", 12), bg="orange")
-        lbl.place(x=290, y=row_y)
+    for i, sid in enumerate(btn_ids, start=1):
+        tk.Label(btn_frame, text=sid, font=small, bg="orange").grid(row=i, column=0, sticky="w", padx=(0, 6))
+        lbl = tk.Label(btn_frame, text="False", font=small, bg="orange")
+        lbl.grid(row=i, column=1, sticky="w")
         btn_labels[sid] = lbl
 
-    # ----- Multi-button panel (shows 4 buttons True/False)
-    multi_id = "Multi_BTN1"
-    tk.Label(root, text="Multi Panel", font=("Helvetica", 12), bg="orange").place(x=25, y=base_y + 5*32 + 12)
+    # ===== Row group 2: Multi Panel (single compact row) =====
+    mid = tk.Frame(panel, bg="orange")
+    mid.grid(row=1, column=0, sticky="nw", pady=(4, 0))
 
+    tk.Label(mid, text="Multi Panel", font=small, bg="orange").grid(row=0, column=0, columnspan=8, sticky="w")
+    multi_id = "Multi_BTN1"
     multi_state = {"states": [False, False, False, False], "last_seq": -1}
     multi_labels = []
-    mp_row_y = base_y + 5*32 + 12 + 26
-
     for i in range(4):
-        tk.Label(root, text=f"Btn{i+1}", font=("Helvetica", 12), bg="orange").place(x=25, y=mp_row_y + i*26)
-        lbl = tk.Label(root, text="False", font=("Helvetica", 12), bg="orange")
-        lbl.place(x=80, y=mp_row_y + i*26)
-        multi_labels.append(lbl)
+        tk.Label(mid, text=f"B{i+1}", font=small, bg="orange").grid(row=1, column=i*2, sticky="w", padx=(0, 4))
+        v = tk.Label(mid, text="False", font=small, bg="orange")
+        v.grid(row=1, column=i*2+1, sticky="w", padx=(0, 10))
+        multi_labels.append(v)
 
-    # Live updater (every 100 ms)
+    # ===== Row group 3: SERVOS (full-width, under Multi) =====
+    right = tk.Frame(panel, bg="orange")
+    right.grid(row=2, column=0, sticky="nw", pady=(6, 0))
+
+    tk.Label(right, text="SERVOS", font=("Helvetica bold", 13), bg="orange").grid(row=0, column=0, columnspan=2, sticky="w")
+
+    servo_ids = ["SERVO1", "SERVO2"]  # edit as needed
+    servo_labels = {}
+    for i, sid in enumerate(servo_ids, start=1):
+        tk.Label(right, text=sid, font=small, bg="orange").grid(row=i, column=0, sticky="w", padx=(0, 10))
+        lbl = tk.Label(right, text="--°", font=small, bg="orange")
+        lbl.grid(row=i, column=1, sticky="w")
+        servo_labels[sid] = lbl
+
+    # ===== Live updater (every 100 ms) =====
     def _update_status():
         # TOF distances
         for sid, lbl in tof_labels.items():
@@ -139,7 +167,7 @@ def MainGUI():
             pressed = rsm.get_value(sid, "pressed", default=None)
             if pressed is not None:
                 btn_states[sid] = bool(pressed)
-            lbl.config(text=str(btn_states[sid]))
+            lbl.config(text="True" if btn_states[sid] else "False")
 
         # Multi-button (update only on new seq)
         rec = rsm.get(multi_id)
@@ -160,11 +188,15 @@ def MainGUI():
                 multi_state["last_seq"] = seq
 
         for i, lbl in enumerate(multi_labels):
-            lbl.config(text=str(multi_state["states"][i]))
+            lbl.config(text=("True" if multi_state["states"][i] else "False"))
+
+        # Servo angles
+        for sid, lbl in servo_labels.items():
+            ang = rsm.get_value(sid, "angle", default=None, max_age_ms=1000)
+            lbl.config(text="--°" if ang is None else f"{int(ang)}°")
 
         root.after(100, _update_status)
 
-    # kick off updater
     root.after(200, _update_status)
 
     root.mainloop()

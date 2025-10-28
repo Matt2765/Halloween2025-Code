@@ -13,8 +13,6 @@ def run():
     while house.HouseActive or house.Demo:
         log_event("[cargoHold] Running loop...")
 
-        speakerTest.testAudio()
-
         t.sleep(1)
             
         if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing

@@ -19,14 +19,6 @@ def run():
             if BreakCheck():
                 return
 
-        dim.dimmer_flicker(
-            channel=4,
-            duration_s=10, 
-            intensity_min=20, 
-            intensity_max=60, 
-            flicker_length_min=0.05, 
-            flicker_length_max=0.18)
-
         for i in range(10):
             t.sleep(1)
             if BreakCheck():
@@ -45,15 +37,6 @@ def run():
                 return
 
         m1Digital_Write(2, 1);  log_event("+120v Strobe 3 (G) OFF")
-
-        dim.dimmer_flicker(
-            channel=4,
-            duration_s=500, 
-            intensity_min=20, 
-            intensity_max=60, 
-            flicker_length_min=0.05, 
-            flicker_length_max=0.18
-        )
 
         for i in range(500):
             t.sleep(1)
