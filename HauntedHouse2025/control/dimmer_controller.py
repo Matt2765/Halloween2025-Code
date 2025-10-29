@@ -113,7 +113,7 @@ def dimmer_flicker(duration: float,
                 time.sleep(0.02)
 
     if threaded:
-        t = threading.Thread(target=_run, daemon=True)
+        t = threading.Thread(target=_run, daemon=True, name="dimmer flicker")
         t.start()
         return t
     else:

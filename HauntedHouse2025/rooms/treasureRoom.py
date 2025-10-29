@@ -13,6 +13,7 @@ def run():
     house.treasureRoom_state = "ACTIVE"
 
     m1Digital_Write(3,0) #ambient light
+    log_event("[treasureRoom] Ambient light ON")
     play_audio("treasureRoom", "treasureRoomAmbience.wav", gain=.7, looping=True)
 
     while house.HouseActive or house.Demo:
@@ -26,6 +27,7 @@ def run():
                 return
         
         m1Digital_Write(3,1) #ambient light
+        log_event("[treasureRoom] Ambient light OFF")
         play_audio("treasureRoom", "treasureRoomHit1.wav", gain=1)
 
         t.sleep(1.8)

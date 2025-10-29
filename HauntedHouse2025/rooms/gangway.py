@@ -15,8 +15,6 @@ def run():
     house.gangway_state = "ACTIVE"
     deadMenTellNoTalesLoop(threaded=True)
 
-    setDoorState(1, "CLOPEN")
-
     #m1Digital_Write(33, 0) #torch lights
 
     #m1Digital_Write(35,0) #strobe/blacklight
@@ -25,21 +23,31 @@ def run():
 
         #m1Digital_Write(33, 0) #torch lights
 
+        setDoorState(1, "CLOPEN")
+
+        count = 0
         while not rsm.obstructed("TOF1", block_mm=800, window_ms=250, min_consecutive=2):
             if BreakCheck():
                 return
+            if count > 30:
+                log_event("No guests detected in gangway for 30 seconds, opening front door.")
+                setDoorState(1, "CLOPEN")
+                count = 0
             t.sleep(.05)
+            count += 0.05
 
         play_audio("gangway", "gangwayHit1.wav", gain=1)
 
         m1Digital_Write(35,0) #strobe/blacklight
+        log_event("[gangway] Strobe/Blacklight ON")
 
-        for i in range(10):
+        for i in range(20):
             t.sleep(1)
             if BreakCheck():
                 return
-            
+                    
         m1Digital_Write(35,1) #strobe/blacklight
+        log_event("[gangway] Strobe/Blacklight OFF")
 
         if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
             if house.Demo:

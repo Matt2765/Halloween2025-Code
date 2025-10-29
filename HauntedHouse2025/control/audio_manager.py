@@ -557,8 +557,10 @@ def play_to_named_channel(wav_file: str, target_name: str, * ,
         extra = f"L={L},R={R}"
 
     log_event(f"[Audio] Playing '{file_path.name}' on {dev_kind.upper()} {mode} ({extra}), "
-              f"gain={gain}, looping={looping}, honor_shutdown={honor_shutdown}, "
-              f"honor_breakcheck={honor_breakcheck}, threaded={threaded}")
+              f"gain={gain}, looping={looping}, threaded={threaded}, "
+              #f"honor_shutdown={honor_shutdown},"
+              #f"honor_breakcheck={honor_breakcheck},"
+              )
     _play_pcm(
         pcm, out_fs, dev[0], dev[4], dev[1], mode, idx_or_pair, gain,
         f"{file_path.name}@{target_name}",

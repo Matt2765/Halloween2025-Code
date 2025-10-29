@@ -24,6 +24,9 @@ def run():
 
         m1Digital_Write(8, 0) # deck ambient ON
 
+        log_event("[graveyard] Ship Lights ON")
+        log_event("[graveyard] Deck Ambient Lights ON")
+
         '''while True:  #SERVO TESTING ONLY
             try:
                 angle = float(input("Enter servo angle (0–180, q to quit): "))
@@ -36,20 +39,13 @@ def run():
 
         MedallionCallsEvent()
 
-        t.sleep(30)
+        #t.sleep(30)
 
         BeckettsDeathEvent()
 
-
         #testEvent()
 
-        #idleEvent()
-
-        idleMusic()
-
-        MedallionCallsEvent()
-
-        idleMusic()
+        #idleMusic()
 
         if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
             if house.Demo:
@@ -276,6 +272,7 @@ def MedallionCallsEvent():
 
 def fireLightsSmoke(loops, threaded=False):
     def main():
+        log_event(f"[graveyard] Enabling fire lights smoke for {loops} loops.")
         for i in range(loops):
             for i in range(3):
                 m1Digital_Write(59,0) #smoke machine
@@ -337,6 +334,7 @@ def flickerAmbientLights(loops, threaded=False):
         main()
 
 def steeringWheel():
+    log_event("[gravyard] Running steering wheel...")
     rsm.servo("SERVO1",angle=5,ramp_ms=3000)
     t.sleep(4)
     if BreakCheck():
@@ -352,6 +350,8 @@ def randAttackerCannons():
         "CannonFireLow02.wav",
         "CannonFireLow04.wav"
     ]
+
+    log_event("[graveyard] Starting random attacker cannons loop...")
     while Scripted_Event and house.HouseActive:
         audio = random.choice(audioFiles)
         play_audio("graveyard", audio, gain=.2)
@@ -360,6 +360,8 @@ def randAttackerCannons():
 
 def randCannons():
     while Scripted_Event and house.HouseActive:
+        if BreakCheck():
+            return
         cannons.fire_cannon(random.randint(1,3))
         t.sleep(random.uniform(10, 20))
 

@@ -23,9 +23,13 @@ def run():
         m1Digital_Write(30,0)   # cargo lightning
         m1Digital_Write(36, 0)  # triangle strobe'''
 
-        bulb_lightning(id=30, flash_ms=100, flashes=(1,3), delay_ms=80, loops=1, threaded=True)
+        bulb_lightning(30, flash_ms=100, flashes=(1,3), delay_ms=80, loops=1, threaded=True)
 
-        t.sleep(1)
+        m1Digital_Write(28, 0)  #filipe ambient
+
+        m1Digital_Write(37, 0)  # brig ambient on
+
+        t.sleep(30)
             
         if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
             if house.Demo:

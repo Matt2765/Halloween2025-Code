@@ -69,6 +69,7 @@ def run():
             break
 
         m1Digital_Write(9,0)  # strobe on
+        log_event("[quarterdeck] Strobe ON")
 
         play_audio("quarterdeck", "quarterdeckHit1.wav", gain=2)
 
@@ -95,6 +96,7 @@ def run():
         setDoorState(2, "CLOSED")  # close door to next room
 
         m1Digital_Write(9,1)  # strobe off
+        log_event("[quarterdeck] Strobe OFF")
 
         if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
             if house.Demo:
