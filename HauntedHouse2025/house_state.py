@@ -11,10 +11,10 @@ class HouseState:
         self.FRthreadRunning = False
         self.remote_sensor_value = None
 
-        self.TRstate = "INACTIVE"
-        self.TRstate = "INACTIVE"
-        self.SRstate = "INACTIVE"
-        self.MkRstate = "INACTIVE"
+        self.gangway_state = "INACTIVE"
+        self.cargoHold_state = "INACTIVE"
+        self.quarterdeck_state = "INACTIVE"
+        self.treasureRoom_state = "INACTIVE"
 
         self.DoorState = {}
         self.TargetDoorState = {}

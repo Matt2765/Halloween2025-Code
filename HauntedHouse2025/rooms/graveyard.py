@@ -19,12 +19,10 @@ def run():
     while house.HouseActive or house.Demo:
         log_event("[Graveyard] Running loop...")
 
-        flashingShipLights(10, .5, threaded=False)
-
-        t.sleep(1)
-
         m1Digital_Write(6, 0) # ship lights ON
         m1Digital_Write(7, 0)
+
+        m1Digital_Write(8, 0) # deck ambient ON
 
         '''while True:  #SERVO TESTING ONLY
             try:
@@ -36,31 +34,44 @@ def run():
 
         threading.Thread(target=steeringWheel, daemon=True, name="Steering Wheel").start()
 
-        m1Digital_Write(8, 0) # deck ambient ON
+        MedallionCallsEvent()
+
+        t.sleep(30)
+
+        BeckettsDeathEvent()
+
 
         #testEvent()
 
         #idleEvent()
 
-        MedallionCallsEvent()
-        for i in range(3):
-            t.sleep(1)
-            if BreakCheck():
-                return        
-            
-        #BeckettsDeathEvent()
-        
-        for i in range(30):
-            t.sleep(1)
-            if BreakCheck():
-                return
+        idleMusic()
 
-        if BreakCheck() or house.Demo:  # end on breakCheck or if demo'ing
-            house.Demo = False
+        MedallionCallsEvent()
+
+        idleMusic()
+
+        if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
+            if house.Demo:
+                house.Demo = False
+                house.HouseActive = False
             toggleHouseLights(True)
-            break
+            return
 
     log_event("[Graveyard] Exiting.")
+
+def idleMusic():
+    audio_files = [
+        "piratesLifeForMe.wav",
+        "DavyJones.wav",
+        "DontThinkNowBestTime.wav",
+        "FamilyAffair.wav",
+        "GuiltyJackSparrow.wav"
+    ]
+    audio = random.choice(audio_files)
+    play_audio("graveyard", audio, gain=.4, threaded=False)
+    log_event(f"Playing Idle music {audio}")
+
     
 def idleEvent():
     while house.HouseActive or house.Demo:
@@ -137,11 +148,19 @@ def MedallionCallsEvent():
     
     play_audio("graveyard", "waterWave01.wav", gain=.7)
     t.sleep(.8)
+    m1Digital_Write(59,0) #smoke machine
     flickerAmbientLights(12, threaded=True)
     m1Digital_Write(43, 0) # mast
     play_audio("graveyard", "impactDebris01.wav", gain=.5)
         
-    for i in range(8):  # 28.8
+    for i in range(4):  # 28.8
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    m1Digital_Write(59,1) #smoke machine
+
+    for i in range(4):  # 28.8
         t.sleep(1)
         if BreakCheck():
             return
@@ -175,6 +194,8 @@ def MedallionCallsEvent():
     
     t.sleep(.2)
 
+    fireLightsSmoke(2, threaded=True) 
+
     dimmer_flicker(6, 20, 100, 0.05, 0.18, True)  # fire lights flicker
     for i in range(7):  # 49
         t.sleep(1)
@@ -189,6 +210,8 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
     cannons.fire_cannon(2)
+
+    fireLightsSmoke(1, threaded=True) 
     
     for i in range(4):  # 60
         t.sleep(1)
@@ -202,6 +225,7 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
         
+    fireLightsSmoke(2, threaded=True) 
     play_audio("graveyard", "waterWave01.wav", gain=1)
     
     for i in range(5):  # 65
@@ -249,6 +273,30 @@ def MedallionCallsEvent():
         
     log_event("[Graveyard] Medallion Calls Event Ending...")
     Scripted_Event = False
+
+def fireLightsSmoke(loops, threaded=False):
+    def main():
+        for i in range(loops):
+            for i in range(3):
+                m1Digital_Write(59,0) #smoke machine
+                t.sleep(.3)
+                m1Digital_Write(59,1) #smoke machine
+                t.sleep(1)
+            t.sleep(3)
+            m1Digital_Write(59,0) #smoke machine
+            t.sleep(1)
+            m1Digital_Write(59,1) #smoke machine
+            t.sleep(4)
+            m1Digital_Write(59,0) #smoke machine
+            t.sleep(3)
+            m1Digital_Write(59,1) #smoke machine
+            if BreakCheck():
+                return
+    
+    if threaded:
+        threading.Thread(target=main, daemon=True, name="fire lights smoke").start()
+    else:
+        main()
 
 def flashingShipLights(duration, delay_s, threaded=False):
     def main():
@@ -311,15 +359,8 @@ def randAttackerCannons():
         
 
 def randCannons():
-    audioFiles = [
-        "CannonDesigned_1.wav",
-        "CannonDesigned_2.wav",
-        "CannonDesigned_3.wav",
-        "CannonDesigned_4.wav"
-    ]
     while Scripted_Event and house.HouseActive:
-        audio = random.choice(audioFiles)
-        play_audio("graveyard", audio, gain=1)
+        cannons.fire_cannon(random.randint(1,3))
         t.sleep(random.uniform(10, 20))
 
 

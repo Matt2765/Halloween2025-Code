@@ -12,23 +12,45 @@ import threading
 
 def run():
     log_event("[gangway] Starting...")
-    house.TRstate = "ACTIVE"
+    house.gangway_state = "ACTIVE"
     deadMenTellNoTalesLoop(threaded=True)
 
-    while house.HouseActive or house.Demo:
-        t.sleep(1)
+    setDoorState(1, "CLOPEN")
 
-        if house.Demo:
-            break
+    #m1Digital_Write(33, 0) #torch lights
+
+    #m1Digital_Write(35,0) #strobe/blacklight
+
+    while house.HouseActive or house.Demo:
+
+        #m1Digital_Write(33, 0) #torch lights
+
+        while not rsm.obstructed("TOF1", block_mm=800, window_ms=250, min_consecutive=2):
+            if BreakCheck():
+                return
+            t.sleep(.05)
+
+        play_audio("gangway", "gangwayHit1.wav", gain=1)
+
+        m1Digital_Write(35,0) #strobe/blacklight
+
+        for i in range(10):
+            t.sleep(1)
+            if BreakCheck():
+                return
+            
+        m1Digital_Write(35,1) #strobe/blacklight
 
         if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
-            house.Demo = False
+            if house.Demo:
+                house.Demo = False
+                house.HouseActive = False
             toggleHouseLights(True)
-            break
+            return
 
         t.sleep(0.1)
 
-    house.TRstate = "INACTIVE"
+    house.gangway_state = "INACTIVE"
     log_event("[gangway] Exiting.")
 
 def deadMenTellNoTalesLoop(threaded=True):
@@ -36,5 +58,7 @@ def deadMenTellNoTalesLoop(threaded=True):
         while house.HouseActive or house.Demo:
             play_audio("gangway", "deadMenTellNoTales.wav", gain=1)
             t.sleep(10)
+            if BreakCheck():
+                return
     if threaded:
         threading.Thread(target=main, daemon=True, name="DMTNT audio loop").start()

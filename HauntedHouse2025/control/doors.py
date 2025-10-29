@@ -13,12 +13,12 @@ DOOR_SOLENOID_PINS = {1: 47, 2: 38}
 DOOR_SENSOR_IDS    = {1: "TOF3", 2: "TOF5"}
 
 OBSTRUCT_RETRY_DELAY_S   = 3.0
-CLOSE_MONITOR_WINDOW_S   = 7.5
-SENSOR_POLL_S            = 0.1
+CLOSE_MONITOR_WINDOW_S   = 5
+SENSOR_POLL_S            = 0.05
 
 # Time to ignore the TOF after commanding a close (door/frame self-pass)
 # Tune per-door: typical 0.4–0.8s
-DOOR_SELF_PASS_IGNORE_S = {1: 0.5, 2: 0.60}
+DOOR_SELF_PASS_IGNORE_S = {1: 0.01, 2: 0.01}
 
 # Obstruction thresholds + detection profiles
 BLOCK_MM_ENTER   = 1500   # threshold to consider "blocked"
@@ -85,7 +85,6 @@ def door_process(id: int):
 
             if door_sensor_obstructed(moving=True):
                 # obstruction → reopen, wait, retry
-                house.DoorState[id] = "CLOPEN"
                 log_event(f"[Doors] Door {id} obstruction detected while closing. Re-opening, waiting, retrying.")
                 m1Digital_Write(pin, 1)                 # reopen
                 t.sleep(OBSTRUCT_RETRY_DELAY_S)
@@ -120,7 +119,6 @@ def door_process(id: int):
 
                 # If obstructed before moving, be sensitive (idle profile)
                 if door_sensor_obstructed(moving=False):
-                    house.DoorState[id] = "CLOPEN"
                     log_event(f"[Doors] Door {id} obstruction present before close. Opening and delaying.")
                     m1Digital_Write(pin, 1)
                     t.sleep(OBSTRUCT_RETRY_DELAY_S)
@@ -129,8 +127,13 @@ def door_process(id: int):
                     break
 
         elif target == "CLOPEN":
-            # Treat as: open now, then caller may set CLOSED later
             open()
+            for i in range(12):
+                if not house.systemState == "ONLINE":
+                    break
+                t.sleep(1)
+            setDoorState(id, "CLOSED")
+
 
     def main():
         house.DoorState[id] = "OPEN"

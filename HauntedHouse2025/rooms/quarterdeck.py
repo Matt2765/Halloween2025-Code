@@ -10,10 +10,11 @@ import random
 from control import remote_sensor_monitor as rsm
 from control.doors import setDoorState
 from control.houseLights import toggleHouseLights
+from control.lightning import bulb_lightning
 
 def run():
     log_event("[Quaterdeck] Starting...")
-    house.SRstate = "ACTIVE"
+    house.quarterdeck_state = "ACTIVE"
 
     play_audio("quarterdeck", "quarterdeckAmbient.wav", gain=.5, looping=True)
 
@@ -32,7 +33,7 @@ def run():
             #print(count)
             if count > 2:
                 count = 0
-                lightning(
+                bulb_lightning(
                     23, 
                     flash_ms=100, 
                     flashes=(3,5), 
@@ -51,7 +52,7 @@ def run():
         dropDownFlash(loops=15, threaded=True)
 
         for i in range(6):
-            lightning(
+            bulb_lightning(
                     23, 
                     flash_ms=100, 
                     flashes=(1,3), 
@@ -79,7 +80,7 @@ def run():
             t.sleep(1)
 
         for i in range(6):  
-            lightning(
+            bulb_lightning(
                     23, 
                     flash_ms=100, 
                     flashes=(1,3), 
@@ -96,11 +97,13 @@ def run():
         m1Digital_Write(9,1)  # strobe off
 
         if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
-            house.Demo = False
+            if house.Demo:
+                house.Demo = False
+                house.HouseActive = False
             toggleHouseLights(True)
-            break
+            return
 
-    house.SRstate = "INACTIVE"
+    house.quarterdeck_state = "INACTIVE"
     log_event("[Quaterdeck] Exiting.")
 
 def dropDownFlash(loops, threaded=True):
@@ -123,47 +126,3 @@ def dropDownFlash(loops, threaded=True):
         threading.Thread(target=main, daemon=True, name="QD drop-down flash").start()
     else:
         main()
-
-def lightning(pin: int, flash_ms: int = 100, flashes: range = (1, 3), delay_ms: int = 80, loops: int = 1, loop_delay_range: range = (1, 3), threaded: bool = True):
-    """
-    Simulate lightning by flashing a relay output rapidly (threaded, interruptible, naturalized).
-
-    Args:
-        pin (int): Digital pin to control (e.g., 23)
-        flash_ms (int): Base ON duration (ms)
-        flashes (int): Number of flashes
-        delay_ms (int): Base delay between flashes (ms)
-    """
-    def _run():
-        log_event(f"[Lightning] Starting lightning sequence on D{pin} ({flashes} flashes)")
-        for i in range(loops):
-            for i in range(random.randint(flashes[0], flashes[1])):
-                if BreakCheck():
-                    log_event(f"[Lightning] Interrupted on D{pin}")
-                    return
-
-                # Randomize flash and delay slightly for realism
-                on_time = flash_ms / 1000 * random.uniform(0.7, 1.3)
-                off_time = delay_ms / 1000 * random.uniform(0.5, 1.5)
-
-                m1Digital_Write(pin, 0)  # ON
-                t.sleep(on_time)
-
-                if BreakCheck():
-                    log_event(f"[Lightning] Interrupted on D{pin}")
-                    return
-
-                m1Digital_Write(pin, 1)  # OFF
-                t.sleep(off_time)
-
-            if BreakCheck():
-                log_event(f"[Lightning] Interrupted on D{pin}")
-                return
-            t.sleep(random.uniform(loop_delay_range[0], loop_delay_range[1]))
-
-        log_event(f"[Lightning] Lightning sequence complete on D{pin}")
-
-    if threaded:
-        threading.Thread(target=_run, daemon=True, name="QD lightning").start()
-    else:
-        _run()

@@ -14,6 +14,8 @@
 # + looping=True/False (loops file audio until BreakCheck() or stop_all_audio())
 # + TTS plays through shutdown & BreakCheck (immune), and now plays on ALL channels by default
 # + NEW mode "all": duplicate mono to every output channel on the device
+# + NEW threaded: bool — choose blocking vs non-blocking playback for file audio (TTS always non-blocking)
+# + BreakCheck() returning True stops all audio EXCEPT TTS
 # -------------------------------------------------------------------
 
 from __future__ import annotations
@@ -385,7 +387,6 @@ def _play_pcm_nonblocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
                         if mode == "stereo":
                             out = np.column_stack((block[:, 0], block[:, 0])) if src_ch == 1 else block[:, :2]
                         elif mode == "all":
-                            # duplicate mono to both
                             mono = block[:, 0:1]
                             out = np.concatenate([mono, mono], axis=1)
                         else:
@@ -425,6 +426,92 @@ def _play_pcm_nonblocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
     tname = f"Looping Audio@{epoch}" if looping else f"Audio@{epoch}"
     threading.Thread(target=_worker, daemon=True, name=tname).start()
 
+def _play_pcm_blocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
+                       have_channels: int, mode: str,
+                       idx_or_pair: Union[int, List[int]],
+                       gain: float, label: str,
+                       *, looping: bool = False,
+                       honor_shutdown: bool = True,
+                       honor_breakcheck: bool = True):
+    """
+    Inline (blocking) variant. Still honors BreakCheck() and stop_all_audio()
+    according to the flags. TTS should NOT call this (TTS is non-blocking by design).
+    """
+    stream = None
+    try:
+        stream, used_fs = _open_stream_robust(fs, have_channels, dev_idx, dev_name)
+        pcm_res, _ = _ensure_samplerate(pcm, fs, used_fs)
+        with stream:
+            n = pcm_res.shape[0]
+            src_ch = pcm_res.shape[1]
+            pos = 0
+            blocksize = stream.blocksize or max(512, used_fs // 25)
+            zero_blk = np.zeros((blocksize, have_channels), np.float32)
+            stream.write(zero_blk)
+            while True:
+                if honor_breakcheck and BreakCheck():
+                    break
+                if honor_shutdown and _stop_event.is_set():
+                    break
+                end = min(pos + blocksize, n)
+                block = pcm_res[pos:end] * gain
+
+                if have_channels <= 1:
+                    out = block[:, :1]
+                elif have_channels == 2:
+                    if mode == "stereo":
+                        out = np.column_stack((block[:, 0], block[:, 0])) if src_ch == 1 else block[:, :2]
+                    elif mode == "all":
+                        mono = block[:, 0:1]
+                        out = np.concatenate([mono, mono], axis=1)
+                    else:
+                        out = np.column_stack((block[:, 0], block[:, 0]))
+                else:
+                    if mode == "all":
+                        mono = block[:, 0:1]
+                        out = np.repeat(mono, have_channels, axis=1)
+                    else:
+                        out = np.zeros((block.shape[0], have_channels), np.float32)
+                        if mode == "stereo":
+                            L, R = int(idx_or_pair[0]), int(idx_or_pair[1])
+                            if src_ch == 1:
+                                out[:, L] = block[:, 0]
+                                out[:, R] = block[:, 0]
+                            else:
+                                out[:, L] = block[:, 0]
+                                out[:, R] = block[:, 1]
+                        else:
+                            idx = min(int(idx_or_pair), have_channels - 1)
+                            out[:, idx] = block[:, 0]
+
+                stream.write(out)
+                pos = end
+                if pos >= n:
+                    if looping:
+                        pos = 0
+                    else:
+                        break
+    finally:
+        if stream:
+            stream.close()
+
+def _play_pcm(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
+              have_channels: int, mode: str,
+              idx_or_pair: Union[int, List[int]],
+              gain: float, label: str,
+              *, looping: bool, honor_shutdown: bool, honor_breakcheck: bool,
+              threaded: bool):
+    if threaded:
+        _play_pcm_nonblocking(
+            pcm, fs, dev_idx, dev_name, have_channels, mode, idx_or_pair, gain, label,
+            looping=looping, honor_shutdown=honor_shutdown, honor_breakcheck=honor_breakcheck
+        )
+    else:
+        _play_pcm_blocking(
+            pcm, fs, dev_idx, dev_name, have_channels, mode, idx_or_pair, gain, label,
+            looping=looping, honor_shutdown=honor_shutdown, honor_breakcheck=honor_breakcheck
+        )
+
 # ==========================================================
 # === PUBLIC PLAYBACK API =================================
 # ==========================================================
@@ -434,7 +521,8 @@ def play_to_named_channel(wav_file: str, target_name: str, * ,
                           base_folder: Path | str | None = None,
                           looping: bool = False,
                           honor_shutdown: bool = True,
-                          honor_breakcheck: bool = True):
+                          honor_breakcheck: bool = True,
+                          threaded: bool = True):
     """
     honor_shutdown:
       - True (default): stream stops on stop_all_audio()
@@ -442,6 +530,9 @@ def play_to_named_channel(wav_file: str, target_name: str, * ,
     honor_breakcheck:
       - True (default): stops when BreakCheck() is True
       - False: ignores BreakCheck() (used for TTS)
+    threaded:
+      - True (default): non-blocking
+      - False: blocking until complete or stopped by BreakCheck/stop_all_audio()
     """
     base_path = Path(base_folder) if base_folder else DEFAULT_SOUND_DIR
     file_path = _resolve_sound_path(wav_file, base_folder=base_path)
@@ -466,13 +557,15 @@ def play_to_named_channel(wav_file: str, target_name: str, * ,
         extra = f"L={L},R={R}"
 
     log_event(f"[Audio] Playing '{file_path.name}' on {dev_kind.upper()} {mode} ({extra}), "
-              f"gain={gain}, looping={looping}, honor_shutdown={honor_shutdown}, honor_breakcheck={honor_breakcheck}")
-    _play_pcm_nonblocking(
+              f"gain={gain}, looping={looping}, honor_shutdown={honor_shutdown}, "
+              f"honor_breakcheck={honor_breakcheck}, threaded={threaded}")
+    _play_pcm(
         pcm, out_fs, dev[0], dev[4], dev[1], mode, idx_or_pair, gain,
         f"{file_path.name}@{target_name}",
         looping=looping,
         honor_shutdown=honor_shutdown,
-        honor_breakcheck=honor_breakcheck
+        honor_breakcheck=honor_breakcheck,
+        threaded=threaded
     )
 
 def play_to_all_channels(wav_or_text: str, *, tts_rate: int = 0,
@@ -480,10 +573,12 @@ def play_to_all_channels(wav_or_text: str, *, tts_rate: int = 0,
                          base_folder: Path | str | None = None,
                          looping: bool = False,
                          honor_shutdown: bool = True,
-                         honor_breakcheck: bool = True):
+                         honor_breakcheck: bool = True,
+                         threaded: bool = True):
     """
     Broadcast a clip (file or TTS) to ALL output channels on PRIMARY.
     For TTS (text input), set honor_shutdown=False and honor_breakcheck=False upstream.
+    threaded controls blocking for FILE playback; TTS is always threaded (non-blocking).
     """
     base_path = Path(base_folder) if base_folder else DEFAULT_SOUND_DIR
     tmp_path = None
@@ -496,30 +591,46 @@ def play_to_all_channels(wav_or_text: str, *, tts_rate: int = 0,
 
         if treat_as_file:
             file_path = _resolve_sound_path(wav_or_text, base_folder=base_path)
+            pcm, src_fs = _read_audio(file_path)
+            # Force mono source for "all" duplication (take L or mono)
+            if pcm.ndim == 2 and pcm.shape[1] > 1:
+                pcm = pcm[:, :1]
+            pcm, out_fs = _ensure_samplerate(pcm, src_fs, 48000)
+            gain = gain_override or 1.0
+            dev = _get_fixed_device("primary")
+
+            log_event(f"[Audio] Playing '{Path(file_path).name}' to ALL on PRIMARY, gain={gain}, "
+                      f"looping={looping}, honor_shutdown={honor_shutdown}, "
+                      f"honor_breakcheck={honor_breakcheck}, threaded={threaded}")
+            _play_pcm(
+                pcm, out_fs, dev[0], dev[4], dev[1], "all", 0, gain,
+                Path(file_path).name,
+                looping=looping,
+                honor_shutdown=honor_shutdown,
+                honor_breakcheck=honor_breakcheck,
+                threaded=threaded
+            )
         else:
+            # TTS path is ALWAYS non-blocking and immune to BreakCheck/shutdown
             fd, tmp = tempfile.mkstemp(suffix=".wav"); os.close(fd)
             tmp_path = Path(tmp)
             text_to_wav(wav_or_text, tmp_path, tts_rate)
-            file_path = tmp_path
+            pcm, src_fs = _read_audio(tmp_path)
+            if pcm.ndim == 2 and pcm.shape[1] > 1:
+                pcm = pcm[:, :1]
+            pcm, out_fs = _ensure_samplerate(pcm, src_fs, 48000)
+            gain = gain_override or 1.0
+            dev = _get_fixed_device("primary")
 
-        pcm, src_fs = _read_audio(file_path)
-        # Force mono source for "all" duplication (take L or mono)
-        if pcm.ndim == 2 and pcm.shape[1] > 1:
-            pcm = pcm[:, :1]
-        pcm, out_fs = _ensure_samplerate(pcm, src_fs, 48000)
-        gain = gain_override or 1.0
-        dev = _get_fixed_device("primary")
-
-        log_event(f"[Audio] Playing '{Path(file_path).name}' to ALL on PRIMARY, gain={gain}, "
-                  f"looping={looping}, honor_shutdown={honor_shutdown}, honor_breakcheck={honor_breakcheck}")
-        # mode="all" duplicates mono to every available output channel
-        _play_pcm_nonblocking(
-            pcm, out_fs, dev[0], dev[4], dev[1], "all", 0, gain,
-            Path(file_path).name,
-            looping=looping,
-            honor_shutdown=honor_shutdown,
-            honor_breakcheck=honor_breakcheck
-        )
+            log_event(f"[Audio] TTS->ALL '{wav_or_text[:48]}...' (len={len(wav_or_text)}) "
+                      f"gain={gain}, threaded=True, immune")
+            _play_pcm_nonblocking(
+                pcm, out_fs, dev[0], dev[4], dev[1], "all", 0, gain,
+                "TTS-ALL",
+                looping=False,
+                honor_shutdown=False,     # immune
+                honor_breakcheck=False    # immune
+            )
     finally:
         if tmp_path and tmp_path.exists():
             try: tmp_path.unlink()
@@ -529,27 +640,30 @@ def play_audio(target_or_text: str, maybe_file: str | None = None, * ,
                gain: float | None = None,
                base_folder: Path | str | None = None,
                tts_rate: int = 0,
-               looping: bool = False):
+               looping: bool = False,
+               threaded: bool = True):
     """
     - play_audio("frontLeft", "boom.wav")           # file -> named (respects shutdown & BreakCheck)
     - play_audio("usb_C", "boom.wav")               # file -> named
     - play_audio("all", "boom.wav")                 # file -> broadcast ALL (respects shutdown & BreakCheck)
-    - play_audio("The manor is opening...")         # TTS -> broadcast ALL, IGNORES shutdown & BreakCheck
-    - play_audio("frontLeft: The manor is opening...")  # TTS -> named, IGNORES shutdown & BreakCheck
+    - play_audio("The manor is opening...")         # TTS -> broadcast ALL, IGNORES shutdown & BreakCheck (non-blocking)
+    - play_audio("frontLeft: The manor is opening...")  # TTS -> named, IGNORES shutdown & BreakCheck (non-blocking)
     - Stereo: if stereo_<name> is configured, play_audio("<name>", file) routes to that L/R pair.
     - looping=True loops file audio only (TTS is not looped).
+    - threaded=False blocks for FILE playback (not for TTS).
     """
     # FILED AUDIO paths
     if maybe_file:
         if target_or_text.lower() == "all":
-            # broadcast file to ALL; this SHOULD respect shutdown & BreakCheck
+            # broadcast file to ALL; respects shutdown & BreakCheck
             play_to_all_channels(
                 maybe_file,
                 gain_override=gain,
                 base_folder=base_folder,
                 looping=looping,
                 honor_shutdown=True,
-                honor_breakcheck=True
+                honor_breakcheck=True,
+                threaded=threaded
             )
         else:
             play_to_named_channel(
@@ -559,11 +673,12 @@ def play_audio(target_or_text: str, maybe_file: str | None = None, * ,
                 base_folder=base_folder,
                 looping=looping,
                 honor_shutdown=True,
-                honor_breakcheck=True
+                honor_breakcheck=True,
+                threaded=threaded
             )
         return
 
-    # "name: text" => TTS on named channel (immune to shutdown & BreakCheck)
+    # "name: text" => TTS on named channel (immune to shutdown & BreakCheck) — always non-blocking
     if ":" in target_or_text:
         name, txt = target_or_text.split(":", 1)
         name, txt = name.strip(), txt.strip()
@@ -574,6 +689,7 @@ def play_audio(target_or_text: str, maybe_file: str | None = None, * ,
             tmp_path = Path(tmp)
             try:
                 text_to_wav(txt, tmp_path, tts_rate)
+                # immune and non-blocking by design
                 play_to_named_channel(
                     str(tmp_path),
                     name,
@@ -581,14 +697,15 @@ def play_audio(target_or_text: str, maybe_file: str | None = None, * ,
                     base_folder=base_folder,
                     looping=False,
                     honor_shutdown=False,     # immune
-                    honor_breakcheck=False    # immune
+                    honor_breakcheck=False,    # immune
+                    threaded=True              # TTS non-blocking
                 )
             finally:
                 try: tmp_path.unlink()
                 except OSError: pass
             return
 
-    # Bare TEXT => TTS broadcast to ALL (immune)
+    # Bare TEXT => TTS broadcast to ALL (immune) — always non-blocking
     play_to_all_channels(
         target_or_text,
         tts_rate=tts_rate,
@@ -596,7 +713,8 @@ def play_audio(target_or_text: str, maybe_file: str | None = None, * ,
         base_folder=base_folder,
         looping=False,
         honor_shutdown=False,     # immune
-        honor_breakcheck=False    # immune
+        honor_breakcheck=False,    # immune
+        threaded=True              # TTS non-blocking
     )
 
 # ==========================================================
@@ -607,6 +725,7 @@ def stop_all_audio(timeout: float = 2.0):
     """
     Signals all honor_shutdown=True streams to stop soon.
     Streams started with honor_shutdown=False (TTS) will IGNORE this cutoff and finish naturally.
+    Also, any currently-blocking file playback will return quickly if honor_shutdown=True.
     """
     global _cutoff_epoch
     with _epoch_lock:
