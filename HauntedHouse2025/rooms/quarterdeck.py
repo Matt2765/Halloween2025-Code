@@ -116,10 +116,10 @@ def dropDownFlash(loops, threaded=True):
                 log_event(f"[DropDown] Interrupted")
                 return
             m1Digital_Write(4, 0)  # ON
-            print("0")
+            #print("0")
             t.sleep(.15)
             m1Digital_Write(4, 1)  # OFF
-            print("1")
+            #print("1")
             t.sleep(.15)
 
         log_event(f"[DropDown] Drop-down flash sequence complete")

@@ -121,20 +121,20 @@ def shutdownDetector():
         log_event("SOFT SHUTDOWN DETECTED - Systems will be restarted to standby.")
         stop_all_audio()
         #t.sleep(1)
-        play_audio("soft shutdown activated", gain=1)
+        play_audio("soft shutdown activated", gain=.3)
         shutdown()
         for _ in range(3):
             toggleHouseLights(False)
             t.sleep(0.25)
             toggleHouseLights(True)
             t.sleep(0.25)
-        play_audio(f"returning to standby in 5 seconds", gain=.7)
+        play_audio(f"returning to standby in 5 seconds", gain=.3)
         for a in range(5, 0, -1):
             log_event(f"Returning to standby in {a} seconds.")
             t.sleep(1)
         #dump_threads()
         house.systemState = "REBOOT"
-        play_audio("system rebooting", gain=0.7)
+        play_audio("system rebooting", gain=0.3)
 
     else:
         log_event("Shutdown ID unknown - Please type keyword 'SAFE' into terminal to return to standby mode.")

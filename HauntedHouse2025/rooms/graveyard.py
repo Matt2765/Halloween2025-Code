@@ -6,6 +6,7 @@ from utils.tools import BreakCheck, log_event
 import random
 import threading
 from control.dimmer_controller import dim, dimmer_flicker
+from control import dimmer_controller as d
 from control.arduino import m1Digital_Write
 from control import cannons
 from control import remote_sensor_monitor as rsm
@@ -15,6 +16,8 @@ Scripted_Event = False
 
 def run():
     log_event("[Graveyard] Starting...")
+
+    #threading.Thread(target=steeringWheel, daemon=True, name="Steering Wheel").start()
 
     while house.HouseActive or house.Demo:
         log_event("[Graveyard] Running loop...")
@@ -35,7 +38,23 @@ def run():
                 print("Exiting...")
                 break'''
 
-        threading.Thread(target=steeringWheel, daemon=True, name="Steering Wheel").start()
+        '''while True:
+            while not rsm.get_button_value("BTN2"):
+                t.sleep(.05)
+                if BreakCheck():
+                    return
+            lightning_bolt(threaded=False)'''
+        
+        '''while True:
+            dimmer_flicker(
+                duration=10,
+                min_intensity=20,
+                max_intensity=80,
+                flicker_length_min=0.05,
+                flicker_length_max=.18,
+                threaded=True
+            )
+            t.sleep(11)'''
 
         MedallionCallsEvent()
 
@@ -88,9 +107,14 @@ def idleEvent():
 def BeckettsDeathEvent():
     global Scripted_Event 
     Scripted_Event = True
+
+    m1Digital_Write(6, 0) # ship lights ON
+    m1Digital_Write(7, 0)
+
+    m1Digital_Write(8, 0) # deck ambient ON
     
     log_event("[Graveyard] Beckett's Death Event Starting...")
-    play_audio("graveyard", "GraveyardScene2v2.wav", gain=.2)
+    play_audio("graveyard", "GraveyardScene2v3part1.wav", gain=.2, threaded=True)
     
     for i in range(58):
         t.sleep(1)
@@ -99,20 +123,199 @@ def BeckettsDeathEvent():
         
     cannons.fire_cannon(3)
     
-    for i in range(5):
+    for i in range(8):
+        t.sleep(1)
+        if BreakCheck():
+            return
+
+    cannons.fire_cannon(1)
+    t.sleep(1)
+    cannons.fire_cannon(2)
+
+    for i in range(7):
         t.sleep(1)
         if BreakCheck():
             return
     
-    threading.Thread(target=randCannons, daemon=True, name="rand cannons initiator").start()
+    threading.Thread(target=randCannons, daemon=True, name="rand cannons initiator").start() #just ship cannons
+    cannons.fire_cannon(3)
+
+    for i in range(20):
+        t.sleep(1)
+        if BreakCheck():
+            return
     
-    for i in range(288):
+    cannons.fire_cannon(3)
+
+    for i in range(2):
+        t.sleep(1)
+        if BreakCheck():
+            return
+
+    play_audio("graveyard", "waterWave02.wav", gain=.7)
+    t.sleep(.8)
+    m1Digital_Write(59,0) #smoke machine
+    flickerAmbientLights(12, threaded=True)
+    play_audio("graveyard", "impactDebris02.wav", gain=.5)
+
+    for i in range(24):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    t.sleep(.8)
+        
+    cannons.fire_cannon(3)
+
+    dimmer_flicker(104, 20, 80, 0.05, 0.18, True)  # fire lights flicker
+
+    for i in range(27):
+        t.sleep(1)
+        if BreakCheck():
+            return
+    
+    cannons.fire_cannon(3)
+
+    for i in range(2):
+        t.sleep(1)
+        if BreakCheck():
+            return
+
+    play_audio("graveyard", "waterWave01.wav", gain=.7)
+    t.sleep(.8)
+    m1Digital_Write(59,0) #smoke machine
+    flickerAmbientLights(12, threaded=True)
+    play_audio("graveyard", "impactDebris01.wav", gain=.5)
+
+    m1Digital_Write(43, 0) # mast
+    t.sleep(.4)
+    m1Digital_Write(43, 1) # mast
+    t.sleep(.4)
+    m1Digital_Write(43, 0) # mast
+    t.sleep(.3)
+    m1Digital_Write(43, 1) # mast
+    t.sleep(.4)
+    m1Digital_Write(43, 0) # mast
+    t.sleep(.2)
+    m1Digital_Write(43, 1) # mast
+
+    for i in range(23):
+        t.sleep(1)
+        if BreakCheck():
+            return
+    
+    #sword fight starts
+
+    lightning_bolt(threaded=True)
+    flickerAmbientLights(5, threaded=True)
+    flashingShipLights(52, .5, threaded=True)
+
+    for i in range(10):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    lightning_bolt(threaded=True)
+    flickerAmbientLights(5, threaded=True)
+
+    for i in range(5):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    cannons.fire_cannon(3)
+
+    for i in range(2):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    play_audio("graveyard", "waterWave01.wav", gain=.7)
+    t.sleep(.8)
+
+    m1Digital_Write(8, 1) # deck ambient
+    dimmer_flicker(31, 20, 100, 0.05, 0.18, True)  # fire lights flicker
+    fireLightsSmoke(1, threaded=True) 
+    flickerAmbientLights(12, threaded=True)
+    play_audio("graveyard", "impactDebris01.wav", gain=.5)
+    m1Digital_Write(43, 0) #mast
+
+    t.sleep(.2)
+
+    for i in range(15):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    lightning_bolt(threaded=True)
+    flickerAmbientLights(5, threaded=True)
+        
+    for i in range(15):
+        t.sleep(1)
+        if BreakCheck():
+            return
+    
+    #fireLightsSmoke(1, threaded=True)
+
+    for i in range(3):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    dim(0)
+    
+    m1Digital_Write(32, 0) #deck strobe
+    m1Digital_Write(8, 1) # deck ambient
+    m1Digital_Write(6, 1) # ship lights
+    m1Digital_Write(7, 1)
+
+    Scripted_Event = False
+
+    m1Digital_Write(59, 0) #smoke machine
+
+    log_event("GraveyardScene2v3part2 STARTED")
+
+    play_audio("graveyard", "GraveyardScene2v3part2.wav", gain=.5, threaded=False)
+
+    log_event("GraveyardScene2v3part2 ENDED")
+    m1Digital_Write(59, 1) #smoke machine
+
+    m1Digital_Write(32, 1) #deck strobe
+        
+    while not rsm.get_button_value("BTN2"):
+        t.sleep(.05)
+        if BreakCheck():
+            return
+    
+    play_audio("graveyard", "OneLastShotEdited.wav", gain=.6)
+
+    for i in range(7):
+        t.sleep(1)
+        if BreakCheck():
+            return
+    t.sleep(.5)
+
+    flashingShipLights(7, .4, threaded=True)
+    ambientLightsFireLightsSeq(10, .5, threaded=True)
+
+    m1Digital_Write(43, 1) # mast
+
+    m1Digital_Write(8, 0) # deck ambient ON
+
+    for i in range(8):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    m1Digital_Write(6, 0) # ship lights ON
+    m1Digital_Write(7, 0)
+
+    for i in range(82):
         t.sleep(1)
         if BreakCheck():
             return
         
     log_event("[Graveyard] Beckett's Death Event Ending...")
-    Scripted_Event = False
     
     
 def MedallionCallsEvent():
@@ -267,8 +470,57 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
         
-    log_event("[Graveyard] Medallion Calls Event Ending...")
     Scripted_Event = False
+        
+    while not rsm.get_button_value("BTN2"):
+        t.sleep(.05)
+        if BreakCheck():
+            return
+    
+    play_audio("graveyard", "OneLastShotEdited.wav", gain=.6)
+
+    for i in range(7):
+        t.sleep(1)
+        if BreakCheck():
+            return
+    t.sleep(.5)
+
+    flashingShipLights(7, .4, threaded=True)
+    ambientLightsFireLightsSeq(10, .5, threaded=True)
+
+    m1Digital_Write(43, 1) # mast
+
+    m1Digital_Write(8, 0) # deck ambient ON
+
+    for i in range(8):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    m1Digital_Write(6, 0) # ship lights ON
+    m1Digital_Write(7, 0)
+
+    for i in range(82):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    log_event("[Graveyard] Medallion Calls Event Ending...")
+
+def ambientLightsFireLightsSeq(loops, speed, threaded=False):
+    def main():
+        for i in range(loops):
+            dim(100)
+            m1Digital_Write(8, 1) # deck ambient
+            t.sleep(speed)
+            dim(0)
+            m1Digital_Write(8, 0) # deck ambient
+            t.sleep(speed)
+
+    if threaded:
+        threading.Thread(target=main, daemon=True, name="ambient and fire lights seq").start()
+    else:
+        main()
 
 def fireLightsSmoke(loops, threaded=False):
     def main():
@@ -278,14 +530,14 @@ def fireLightsSmoke(loops, threaded=False):
                 m1Digital_Write(59,0) #smoke machine
                 t.sleep(.3)
                 m1Digital_Write(59,1) #smoke machine
-                t.sleep(1)
-            t.sleep(3)
+                t.sleep(.3)
+            t.sleep(1)
             m1Digital_Write(59,0) #smoke machine
             t.sleep(1)
             m1Digital_Write(59,1) #smoke machine
-            t.sleep(4)
+            t.sleep(1)
             m1Digital_Write(59,0) #smoke machine
-            t.sleep(3)
+            t.sleep(2)
             m1Digital_Write(59,1) #smoke machine
             if BreakCheck():
                 return
@@ -334,15 +586,16 @@ def flickerAmbientLights(loops, threaded=False):
         main()
 
 def steeringWheel():
-    log_event("[gravyard] Running steering wheel...")
-    rsm.servo("SERVO1",angle=5,ramp_ms=3000)
-    t.sleep(4)
-    if BreakCheck():
-        return
-    rsm.servo("SERVO1",angle=85,ramp_ms=3000)
-    t.sleep(4)
-    if BreakCheck():    
-        return
+    while house.HouseActive or house.Demo:
+        log_event("[gravyard] Running steering wheel...")
+        rsm.servo("SERVO1",angle=0,ramp_ms=3000)
+        t.sleep(4)
+        if BreakCheck():
+            return
+        rsm.servo("SERVO1",angle=160,ramp_ms=3000)
+        t.sleep(4)
+        if BreakCheck():    
+            return
 
 def randAttackerCannons():
     audioFiles = [
@@ -362,8 +615,8 @@ def randCannons():
     while Scripted_Event and house.HouseActive:
         if BreakCheck():
             return
-        cannons.fire_cannon(random.randint(1,3))
-        t.sleep(random.uniform(10, 20))
+        cannons.fire_cannon(random.randint(1,2))
+        t.sleep(random.uniform(20, 30))
 
 
 def testEvent():
@@ -501,25 +754,43 @@ def testEvent():
     log_event("[Graveyard] Test Event Ending...")
     Scripted_Event = False
 
-def lightning_bolt():
-    log_event("[Graveyard] Lightning Bolt Triggered")
+def lightning_bolt(threaded=False):
 
-    m1Digital_Write(32, 0)  # Deck strobe
+    audioFiles = [
+        "thunder1.wav",
+        "thunder2.wav",
+        "thunder3.wav",
+        "thunder4.wav"
+    ]
 
-    m1Digital_Write(29, 0)  # Deck lightning ON
-    t.sleep(0.1)
-    m1Digital_Write(29, 1)  # Deck lightning OFF
-    t.sleep(1.1)
-    m1Digital_Write(29, 0)  # Deck lightning ON
-    t.sleep(0.07)
-    m1Digital_Write(29, 1)  # Deck lightning OFF
-    t.sleep(.5)
-    m1Digital_Write(29, 0)  # Deck lightning ON
-    t.sleep(0.07)
-    m1Digital_Write(29, 1)  # Deck lightning OFF
-    t.sleep(.5)
-    m1Digital_Write(29, 0)  # Deck lightning ON
-    t.sleep(0.07)
-    m1Digital_Write(29, 1)  # Deck lightning OFF
+    def main():
+        log_event("[Graveyard] Lightning Bolt Triggered")
 
-    m1Digital_Write(32, 1)  # Deck strobe
+        audio =  random.choice(audioFiles)
+
+        play_audio("graveyard", audio, gain=1)
+
+        m1Digital_Write(32, 0)  # Deck strobe
+
+        m1Digital_Write(29, 0)  # Deck lightning ON
+        t.sleep(0.1)
+        m1Digital_Write(29, 1)  # Deck lightning OFF
+        t.sleep(1.1)
+        m1Digital_Write(29, 0)  # Deck lightning ON
+        t.sleep(0.07)
+        m1Digital_Write(29, 1)  # Deck lightning OFF
+        t.sleep(.5)
+        m1Digital_Write(29, 0)  # Deck lightning ON
+        t.sleep(0.07)
+        m1Digital_Write(29, 1)  # Deck lightning OFF
+        t.sleep(.5)
+        m1Digital_Write(29, 0)  # Deck lightning ON
+        t.sleep(0.07)
+        m1Digital_Write(29, 1)  # Deck lightning OFF
+
+        m1Digital_Write(32, 1)  # Deck strobe
+    
+    if threaded:
+        threading.Thread(target=main, daemon=True, name="lightning bolt").start()
+    else:
+        main()

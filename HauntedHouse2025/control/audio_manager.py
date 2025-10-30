@@ -60,8 +60,8 @@ usb7_channels: Dict[str, Dict[str, Union[float, int, List[int]]]] = {
 
     "usb_C":   {"index": 2, "gain": 1.0},
     "usb_LFE": {"index": 3, "gain": 1.0},
-    "usb_SL":  {"index": 4, "gain": 1.0},
-    "usb_SR":  {"index": 5, "gain": 1.0},
+    "stereo_beckettPA_L":  {"index": 4, "gain": 1.0},
+    "stereo_beckettPA_R":  {"index": 5, "gain": 1.0},
     "usb_BL":  {"index": 6, "gain": 1.0},
     "usb_BR":  {"index": 7, "gain": 1.0},
 }

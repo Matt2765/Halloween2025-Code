@@ -98,14 +98,14 @@
 # -----------------------------------------------------------------------------
 # API REFERENCE (MOST USED)
 # -----------------------------------------------------------------------------
-# init(port: Optional[str]=None, baud: int=921600) -> None
+# init(port: Optional[str]=None, baud: int=DEFAULT_BAUD) -> None
 #     Starts the background process, the shared table, and TX queues. Idempotent.
 #     - port=None: attempt auto-detection (uses common USB-UART descriptors).
 #
 # get(sensor_id: str) -> Optional[dict]
 #     Returns the latest raw record (or None if unknown).
 #
-# get_value(sensor_id: str, key: str, default: Any=None, max_age_ms: Optional[int]=250) -> Any
+# get_value(sensor_id: str, key: str, default: Any=None, max_age_ms: Optional[int]=STALE_DEFAULT_MS) -> Any
 #     Returns vals[key] from the latest record, enforcing staleness via max_age_ms.
 #     If data is too old (or missing), returns default. Special case for "dist_mm":
 #       negatives (e.g., -1) are *coerced to FAR_DISTANCE_MM* to represent “very far”.
@@ -588,6 +588,28 @@ def servo(device_id: str, angle: int, ramp_ms: Optional[int] = None) -> None:
 
     tx_to_id(device_id, payload)
 
+# ---------- Sprite trigger helpers ----------
+def sprite_next(device_id: str, pulse_ms: int = 150) -> None:
+    """
+    Momentarily "press" the Sprite's NEXT/trigger input via its ESP-NOW node.
+    The node should act on: {"id":"<ID>","cmd":"next","pulse_ms":<ms>}.
+    """
+    if not isinstance(device_id, str) or not device_id:
+        raise ValueError("sprite_next(): 'device_id' must be a non-empty string")
+    try:
+        ms = int(pulse_ms)
+    except Exception:
+        raise ValueError("sprite_next(): 'pulse_ms' must be an integer (milliseconds)")
+    if ms < 20:
+        ms = 20  # ensure a minimal visible press
+    tx_to_id(device_id, {"id": device_id, "cmd": "next", "pulse_ms": ms})
+
+def activateSprite(device_id: str, pulse_ms: int = 150) -> None:
+    """
+    Alias for sprite_next(); provided for convenience.
+    """
+    sprite_next(device_id, pulse_ms)
+
 # ---------- Snapshot / formatting / watch ----------
 def snapshot() -> Dict[str, dict]:
     return dict(_shared) if _shared else {}
@@ -780,3 +802,31 @@ def button_pop(timeout: float=0.0) -> Optional[dict]:
         return _btnq.get(timeout=timeout)
     except queue.Empty:
         return None
+    
+# ---------- Button value helper ----------
+def get_button_value(device_id: str, btn_num: int | None = None) -> Optional[bool]:
+    """
+    Returns the last known pressed state of a button.
+      - For single-button devices (e.g., 'BTN1'), call:  get_button_value('BTN1')
+      - For multi-button devices (e.g., 'Multi_BTN1'), call:  get_button_value('Multi_BTN1', 3)
+    Returns:
+        True  -> button currently pressed
+        False -> button currently released
+        None  -> no data yet or button never seen
+    """
+    rec = get(device_id)
+    if not rec:
+        return None
+
+    vals = rec.get("vals", {})
+    rec_btn = vals.get("btn")
+    pressed = vals.get("pressed")
+
+    # Single-button device (no btn_num needed)
+    if btn_num is None:
+        return bool(pressed) if pressed is not None else None
+
+    # Multi-button device (only return if it matches desired button number)
+    if rec_btn == btn_num:
+        return bool(pressed)
+    return None

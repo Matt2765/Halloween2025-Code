@@ -58,7 +58,10 @@ def fire_cannon(cannon_id:int):
 
         audio = random.choice(audioFiles)
         interiorAudio = random.choice(interior_audioFiles)
-        play_audio("graveyard", audio, gain=1)
+        if cannon_id == 3:
+            play_audio("beckettPA", audio, gain=1)
+        else:
+            play_audio("graveyard", audio, gain=1)
         play_audio("cargoHold", interiorAudio, gain=1)
         play_audio("quarterdeck", interiorAudio, gain=1)
         play_audio("gangway", interiorAudio, gain=1)

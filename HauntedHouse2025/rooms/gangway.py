@@ -21,7 +21,7 @@ def run():
 
     while house.HouseActive or house.Demo:
 
-        #m1Digital_Write(33, 0) #torch lights
+        m1Digital_Write(33, 0) #torch lights
 
         setDoorState(1, "CLOPEN")
 
@@ -38,6 +38,7 @@ def run():
 
         play_audio("gangway", "gangwayHit1.wav", gain=1)
 
+        m1Digital_Write(33, 1) #torch lights
         m1Digital_Write(35,0) #strobe/blacklight
         log_event("[gangway] Strobe/Blacklight ON")
 
