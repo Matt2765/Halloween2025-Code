@@ -17,6 +17,7 @@ def run():
     threading.Thread(target=brig, daemon=True, name="brig").start()
 
     m1Digital_Write(51, 0)  # ROWING SKELETON
+    log_event("[cargoHold] Filipe ENABLED.")
 
     while house.HouseActive or house.Demo:
         log_event("[cargoHold] Running loop...")
@@ -29,7 +30,9 @@ def run():
         m1Digital_Write(36, 0)  # triangle strobe'''
 
         m1Digital_Write(28, 0)  #filipe ambient
+        log_event("[cargoHold] Filipe ambient ON.")
         m1Digital_Write(36, 1)  #triangle strobe
+        log_event("[cargoHold] Triangle strobe OFF.")
 
         count = 0
         while not rsm.get_button_value("BTN1"):
@@ -41,21 +44,25 @@ def run():
             if BreakCheck():
                 return
         
-        play_audio("cargoHold", "triangleHit.wav", gain=1)
+        play_audio("cargoHold", "triangleHitv2.wav", gain=1)
         m1Digital_Write(36, 0)  #triangle strobe
-        for i in range(8):
+        log_event("[cargoHold] Triangle strobe ON.")
+        for i in range(14):
             m1Digital_Write(28, 1)  #filipe ambient
             t.sleep(.1)
             m1Digital_Write(28, 0)  #filipe ambient
             t.sleep(.1)
 
-        for i in range(10):
+        '''for i in range(1):
             t.sleep(1)
             if BreakCheck():
-                return
+                return'''
             
         if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
             if house.Demo:
+                m1Digital_Write(51, 1)  # ROWING SKELETON
+                m1Digital_Write(28, 1)  #filipe ambient
+                m1Digital_Write(36, 1)  #triangle strobe
                 house.Demo = False
                 house.HouseActive = False
             toggleHouseLights(True)
@@ -67,26 +74,45 @@ def run():
 def brig():
     while house.HouseActive or house.Demo:
         m1Digital_Write(37, 0)  # brig ambient on
+        log_event("[cargoHold] Brig ambient ON")
         m1Digital_Write(34, 1)  # brig strobe/blacklight
+        log_event("[cargoHold] Brig strobe/blacklight OFF")
         m1Digital_Write(28, 0)  #filipe ambient
+        log_event("[cargoHold] Filipe ambient ON")
+        
 
         while not rsm.get_button_value("BTN4"):
             t.sleep(.05)
             if BreakCheck():
                 return
         
+        play_audio("cargoHold", "brigHit1.wav", gain=1)
+
+        t.sleep(.9)
+
         m1Digital_Write(28, 1)  #filipe ambient
+        log_event("[cargoHold] Filipe ambient OFF.")
         m1Digital_Write(37, 1)  # brig ambient
+        log_event("[cargoHold] Brig ambient OFF")
 
         m1Digital_Write(34, 0)  # brig strobe/blacklight
+        log_event("[cargoHold] Brig strobe/blacklight ENABLED.")
 
-        for i in range(10):
+        for i in range(4):
             t.sleep(1)
             if BreakCheck():
                 return
             
         if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
             if house.Demo:
+                m1Digital_Write(51, 1)  # ROWING SKELETON
+                log_event("[cargoHold] Filipe DISABLED.")
+                m1Digital_Write(28, 1)  #filipe ambient
+                log_event("[cargoHold] Filipe ambient OFF.")
+                m1Digital_Write(36, 1)  #triangle strobe
+                log_event("[cargoHold] Triangle strobe  OFF.")
+                m1Digital_Write(34, 1)  # brig strobe/blacklight
+                log_event("[cargoHold] Brig strobe/blaklight OFF.")
                 house.Demo = False
                 house.HouseActive = False
             toggleHouseLights(True)

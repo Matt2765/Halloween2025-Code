@@ -131,9 +131,12 @@ def BeckettsDeathEvent():
     Scripted_Event = True
 
     m1Digital_Write(6, 0) # ship lights ON
+    log_event("[graveyard] Ship Lights ON")
     m1Digital_Write(7, 0)
+    log_event("[graveyard] Ship Lights ON")
 
     m1Digital_Write(8, 0) # deck ambient ON
+    log_event("[graveyard] Deck Ambient Lights ON")
     
     log_event("[Graveyard] Beckett's Death Event Starting...")
     play_audio("graveyard", "GraveyardScene2v3part1.wav", gain=.2, threaded=True)
@@ -177,6 +180,7 @@ def BeckettsDeathEvent():
     play_audio("graveyard", "waterWave02.wav", gain=.7)
     t.sleep(.8)
     m1Digital_Write(59,0) #smoke machine
+    log_event("[graveyard] Smoke Machine ON")
     flickerAmbientLights(12, threaded=True)
     play_audio("graveyard", "impactDebris02.wav", gain=.5)
 
@@ -208,6 +212,7 @@ def BeckettsDeathEvent():
     play_audio("graveyard", "waterWave01.wav", gain=.7)
     t.sleep(.8)
     m1Digital_Write(59,0) #smoke machine
+    log_event("[graveyard] Smoke Machine ON")
     flickerAmbientLights(12, threaded=True)
     play_audio("graveyard", "impactDebris01.wav", gain=.5)
 
@@ -258,6 +263,7 @@ def BeckettsDeathEvent():
     t.sleep(.8)
 
     m1Digital_Write(8, 1) # deck ambient
+    log_event("[graveyard] Deck Ambient Lights OFF")
     dimmer_flicker(31, 20, 100, 0.05, 0.18, True)  # fire lights flicker
     fireLightsSmoke(1, threaded=True) 
     flickerAmbientLights(12, threaded=True)
@@ -291,13 +297,18 @@ def BeckettsDeathEvent():
     dim(0)
     
     m1Digital_Write(32, 0) #deck strobe
+    log_event("[graveyard] Deck Strobe ON")
     m1Digital_Write(8, 1) # deck ambient
+    log_event("[graveyard] Deck Ambient Lights OFF")
     m1Digital_Write(6, 1) # ship lights
+    log_event("[graveyard] Ship Lights OFF")
     m1Digital_Write(7, 1)
+    log_event("[graveyard] Ship Lights OFF")
 
     Scripted_Event = False
 
     m1Digital_Write(59, 0) #smoke machine
+    log_event("[graveyard] Smoke Machine ON")
 
     log_event("GraveyardScene2v3part2 STARTED")
 
@@ -305,8 +316,10 @@ def BeckettsDeathEvent():
 
     log_event("GraveyardScene2v3part2 ENDED")
     m1Digital_Write(59, 1) #smoke machine
+    log_event("[graveyard] Smoke Machine OFF")
 
     m1Digital_Write(32, 1) #deck strobe
+    log_event("[graveyard] Deck Strobe OFF")
         
     while not rsm.get_button_value("BTN2"):
         t.sleep(.05)
@@ -327,6 +340,7 @@ def BeckettsDeathEvent():
     m1Digital_Write(43, 1) # mast
 
     m1Digital_Write(8, 0) # deck ambient ON
+    log_event("[graveyard] Deck Ambient Lights ON")
 
     for i in range(8):
         t.sleep(1)
@@ -334,7 +348,9 @@ def BeckettsDeathEvent():
             return
         
     m1Digital_Write(6, 0) # ship lights ON
+    log_event("[graveyard] Ship Lights ON")
     m1Digital_Write(7, 0)
+    log_event("[graveyard] Ship Lights ON")
 
     for i in range(82):
         t.sleep(1)
@@ -374,8 +390,10 @@ def MedallionCallsEvent():
     play_audio("graveyard", "waterWave01.wav", gain=.7)
     t.sleep(.8)
     m1Digital_Write(59,0) #smoke machine
+    log_event("[graveyard] Smoke Machine ON")
     flickerAmbientLights(12, threaded=True)
     m1Digital_Write(43, 0) # mast
+    m1Digital_Write(43, 1) # mast
     play_audio("graveyard", "impactDebris01.wav", gain=.5)
         
     for i in range(4):  # 28.8
@@ -384,6 +402,7 @@ def MedallionCallsEvent():
             return
         
     m1Digital_Write(59,1) #smoke machine
+    log_event("[graveyard] Smoke Machine OFF")
 
     for i in range(4):  # 28.8
         t.sleep(1)
@@ -416,6 +435,7 @@ def MedallionCallsEvent():
     play_audio("graveyard", "impactDebris04.wav", gain=.5)
     flickerAmbientLights(6, threaded=False)
     m1Digital_Write(8, 1) # ambient OFF
+    log_event("[graveyard] Deck Ambient Lights OFF")
     
     t.sleep(.2)
 
@@ -480,6 +500,7 @@ def MedallionCallsEvent():
     play_audio("graveyard", "impactDebris03.wav", gain=.5)
     flickerAmbientLights(6, threaded=False)
     m1Digital_Write(8, 1) # ambient OFF
+    log_event("[graveyard] Deck Ambient Lights OFF")
     
     for i in range(10):  # 87
         t.sleep(1)
@@ -521,6 +542,7 @@ def MedallionCallsEvent():
     m1Digital_Write(43, 1) # mast
 
     m1Digital_Write(8, 0) # deck ambient ON
+    log_event("[graveyard] Deck Ambient Lights ON")
 
     for i in range(8):
         t.sleep(1)
@@ -528,7 +550,9 @@ def MedallionCallsEvent():
             return
         
     m1Digital_Write(6, 0) # ship lights ON
+    log_event("[graveyard] Ship Lights ON")
     m1Digital_Write(7, 0)
+    log_event("[graveyard] Ship Lights ON")
 
     for i in range(82):
         t.sleep(1)
@@ -663,7 +687,9 @@ def testEvent():
             return
         
     m1Digital_Write(32, 1)  # Deck strobe
+    log_event("[graveyard] Deck Strobe OFF")
     m1Digital_Write(29, 1)  # Deck lightning
+    log_event("[graveyard] Deck Lightning OFF")
 
     for i in range(10):
         t.sleep(1)

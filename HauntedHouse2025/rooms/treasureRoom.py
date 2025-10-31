@@ -40,6 +40,7 @@ def run():
                 return
 
         m1Digital_Write(3,0) #ambient light
+        log_event("+120v Ambient Light 4 (G) ON")
         m1Digital_Write(2, 1);  log_event("+120v Strobe 3 (G) OFF")
 
         for i in range(10):
@@ -56,4 +57,3 @@ def run():
 
     house.treasureRoom_state = "INACTIVE"
     log_event("[treasureRoom] Exiting.")
-

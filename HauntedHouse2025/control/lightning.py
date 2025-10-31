@@ -15,7 +15,7 @@ def bulb_lightning(pin: int, flash_ms: int = 100, flashes: range = (1, 3), delay
         delay_ms (int): Base delay between flashes (ms)
     """
     def _run():
-        #log_event(f"[Lightning] Starting lightning sequence on D{pin} ({flashes} flashes)")
+        log_event(f"[Lightning] Starting lightning sequence on D{pin} ({flashes} flashes)")
         for i in range(loops):
             for i in range(random.randint(flashes[0], flashes[1])):
                 if BreakCheck():
