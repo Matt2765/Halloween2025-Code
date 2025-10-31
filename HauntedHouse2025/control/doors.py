@@ -21,7 +21,7 @@ SENSOR_POLL_S            = 0.05
 DOOR_SELF_PASS_IGNORE_S = {1: 0.01, 2: 0.01}
 
 # Obstruction thresholds + detection profiles
-BLOCK_MM_ENTER   = 1500   # threshold to consider "blocked"
+BLOCK_MM_ENTER   = {1: 1500, 2: 1050}   # threshold to consider "blocked"
 BLOCK_MM_CLEAR   = 900   # reserved if you later implement explicit hysteresis in rsm
 
 IDLE_WINDOW_MS   = 250   # sensitive when idle
@@ -52,14 +52,14 @@ def door_process(id: int):
         if moving:
             return rsm.obstructed(
                 DOOR_SENSOR_IDS[id],
-                block_mm=BLOCK_MM_ENTER,
+                block_mm=BLOCK_MM_ENTER[id],
                 window_ms=MOVING_WINDOW_MS,
                 min_consecutive=MOVING_MIN_CONSEC
             )
         else:
             return rsm.obstructed(
                 DOOR_SENSOR_IDS[id],
-                block_mm=BLOCK_MM_ENTER,
+                block_mm=BLOCK_MM_ENTER[id],
                 window_ms=IDLE_WINDOW_MS,
                 min_consecutive=IDLE_MIN_CONSEC
             )

@@ -55,8 +55,30 @@ def run():
                 threaded=True
             )
             t.sleep(11)'''
+        
+        '''while house.systemState == "ONLINE":
+            play_audio("sprite 1 file 001")
+            rsm.sprite_play("SPRITE1", 1)
+            t.sleep(20)
+            play_audio("sprite 1 file 002")
+            rsm.sprite_play("SPRITE1", 2)
+            t.sleep(20)
 
-        MedallionCallsEvent()
+        if BreakCheck():
+            return'''
+        
+        while True:
+            m1Digital_Write(31,0)
+            t.sleep(7)
+            m1Digital_Write(31,1)
+            t.sleep(7)
+            '''cannons.fire_cannon(3)
+            for i in range(10):
+                t.sleep(1)'''
+            if BreakCheck():
+                return
+
+        #MedallionCallsEvent()
 
         #t.sleep(30)
 
@@ -167,6 +189,8 @@ def BeckettsDeathEvent():
         
     cannons.fire_cannon(3)
 
+    rsm.sprite_play("SPRITE1", 1) #fire start
+
     dimmer_flicker(104, 20, 80, 0.05, 0.18, True)  # fire lights flicker
 
     for i in range(27):
@@ -261,6 +285,8 @@ def BeckettsDeathEvent():
         t.sleep(1)
         if BreakCheck():
             return
+        
+    rsm.sprite_play("SPRITE1", 2) #fire end
         
     dim(0)
     
@@ -395,6 +421,8 @@ def MedallionCallsEvent():
 
     fireLightsSmoke(2, threaded=True) 
 
+    rsm.sprite_play("SPRITE1", 1) #fire start
+
     dimmer_flicker(6, 20, 100, 0.05, 0.18, True)  # fire lights flicker
     for i in range(7):  # 49
         t.sleep(1)
@@ -469,6 +497,8 @@ def MedallionCallsEvent():
         t.sleep(1)
         if BreakCheck():
             return
+        
+    rsm.sprite_play("SPRITE1", 2) #fire end
         
     Scripted_Event = False
         

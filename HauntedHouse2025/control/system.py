@@ -19,6 +19,7 @@ from rooms import graveyard
 from control.doors import spawn_doors
 import control.dimmer_controller as dim
 from control.shutdown import shutdown
+import random
 
 def initialize_system():
     while True:
@@ -109,6 +110,8 @@ def StartHouse():
             name=cargoHold.__name__.split('.')[-1]
         ).start()
 
+        noScareDetector(threaded=True)
+
         shipAmbience()
 
         while house.HouseActive:
@@ -128,3 +131,48 @@ def shipAmbience():
     play_audio("cargoHold", "shipAmbienceCUT.wav", gain=1, looping=True)
     play_audio("gangway", "shipAmbienceCUT.wav", gain=1, looping=True)
     play_audio("quarterdeck", "shipAmbienceCUT.wav", gain=1, looping=True)
+
+def noScareDetector(threaded=False):
+    no_scare_files = [
+    "noScare1.wav",
+    "noScare2.wav",
+    "noScare3.wav",
+    "noScare4.wav",
+    "noScare5.wav",
+    "noScare6.wav",
+    "noScare7.wav",
+    "noScare8.wav",
+    "noScare9.wav",
+    "noScare10.wav",
+    "noScare11.wav"
+    ]
+
+    def main():
+        while not remote_sensor_monitor.get_button_value("BTN3"):
+            t.sleep(.05)
+            if BreakCheck():
+                return
+
+        t.sleep(1)
+
+        while not remote_sensor_monitor.get_button_value("BTN3"):
+            audio = random.choice(no_scare_files)
+            play_audio(audio, threaded=True)
+
+            for i in range(300): #15 secs
+                if remote_sensor_monitor.get_button_value("BTN3"):
+                    break
+                t.sleep(.05)
+                if BreakCheck():
+                    return
+                
+        for i in range(5):
+            t.sleep(1)
+            if BreakCheck():
+                return
+            
+    if threaded:
+        threading.Thread(target=main, daemon=True, name="no scare detector").start()
+    else:
+        main()
+        

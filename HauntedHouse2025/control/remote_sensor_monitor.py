@@ -589,26 +589,25 @@ def servo(device_id: str, angle: int, ramp_ms: Optional[int] = None) -> None:
     tx_to_id(device_id, payload)
 
 # ---------- Sprite trigger helpers ----------
-def sprite_next(device_id: str, pulse_ms: int = 150) -> None:
+# ---------- Sprite control (generalized) ----------
+def sprite_play(device_id: str, index: int) -> None:
     """
-    Momentarily "press" the Sprite's NEXT/trigger input via its ESP-NOW node.
-    The node should act on: {"id":"<ID>","cmd":"next","pulse_ms":<ms>}.
+    Play a specific Sprite file by numeric index (0..200 corresponds to 000..200.xxx on SD card).
+
+    Args:
+        device_id (str): ESP-NOW ID of the Sprite controller (e.g. 'SPRITE1')
+        index (int): file number to play, e.g. 3 -> plays 003.xxx
     """
     if not isinstance(device_id, str) or not device_id:
-        raise ValueError("sprite_next(): 'device_id' must be a non-empty string")
+        raise ValueError("sprite_play(): 'device_id' must be a non-empty string")
     try:
-        ms = int(pulse_ms)
+        idx = int(index)
     except Exception:
-        raise ValueError("sprite_next(): 'pulse_ms' must be an integer (milliseconds)")
-    if ms < 20:
-        ms = 20  # ensure a minimal visible press
-    tx_to_id(device_id, {"id": device_id, "cmd": "next", "pulse_ms": ms})
+        raise ValueError("sprite_play(): 'index' must be an integer 0..200")
+    if idx < 0 or idx > 200:
+        raise ValueError("sprite_play(): 'index' must be between 0 and 200")
 
-def activateSprite(device_id: str, pulse_ms: int = 150) -> None:
-    """
-    Alias for sprite_next(); provided for convenience.
-    """
-    sprite_next(device_id, pulse_ms)
+    tx_to_id(device_id, {"id": device_id, "cmd": "play", "index": idx})
 
 # ---------- Snapshot / formatting / watch ----------
 def snapshot() -> Dict[str, dict]:
