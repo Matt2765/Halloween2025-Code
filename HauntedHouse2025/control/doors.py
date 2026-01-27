@@ -13,7 +13,7 @@ DOOR_SOLENOID_PINS = {1: 47, 2: 38}
 DOOR_SENSOR_IDS    = {1: "TOF3", 2: "TOF5"}
 
 OBSTRUCT_RETRY_DELAY_S   = 3.0
-CLOSE_MONITOR_WINDOW_S   = 5
+CLOSE_MONITOR_WINDOW_S   = 4
 SENSOR_POLL_S            = 0.05
 
 # Time to ignore the TOF after commanding a close (door/frame self-pass)
@@ -21,7 +21,7 @@ SENSOR_POLL_S            = 0.05
 DOOR_SELF_PASS_IGNORE_S = {1: 0.01, 2: 0.01}
 
 # Obstruction thresholds + detection profiles
-BLOCK_MM_ENTER   = {1: 1500, 2: 1050}   # threshold to consider "blocked"
+BLOCK_MM_ENTER   = {1: 1500, 2: 800}   # threshold to consider "blocked"
 BLOCK_MM_CLEAR   = 900   # reserved if you later implement explicit hysteresis in rsm
 
 IDLE_WINDOW_MS   = 250   # sensitive when idle

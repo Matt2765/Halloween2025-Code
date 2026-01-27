@@ -18,6 +18,8 @@ def run():
 
     play_audio("quarterdeck", "quarterdeckAmbient.wav", gain=.5, looping=True)
 
+    prisonerArms(threaded=True)
+
     while house.HouseActive or house.Demo:
         log_event("[Quaterdeck] Running loop...")
 
@@ -26,6 +28,8 @@ def run():
         #m1Digital_Write(4, 0) #Drop down light
 
         #m1Digital_Write(9, 0) #strobe
+
+        #m1Digital_Write(53, 0) #prisoner arms
 
         count = 0
         while not rsm.obstructed("TOF2", block_mm=2500, window_ms=250, min_consecutive=2):
@@ -51,7 +55,7 @@ def run():
         play_audio("quarterdeck", "quarterdeckTease1.wav", gain=.7)
         dropDownFlash(loops=15, threaded=True)
 
-        for i in range(6):
+        for i in range(7):
             bulb_lightning(
                     23, 
                     flash_ms=100, 
@@ -64,23 +68,36 @@ def run():
                 break
             t.sleep(1)  
 
-        t.sleep(3)
+        #t.sleep(1)
         if BreakCheck():
             break
+
+        play_audio("quarterdeck", "quarterdeckHitLayer1.wav", gain=1)
+
+        for i in range(1):
+            if BreakCheck():
+                break
+            t.sleep(1)
+
+        play_audio("quarterdeck", "Digital_Scream_3.wav", gain=.7)
+
+        t.sleep(.5)
 
         m1Digital_Write(9,0)  # strobe on
         log_event("[quarterdeck] Strobe ON")
 
-        play_audio("quarterdeck", "quarterdeckHit1.wav", gain=2)
+        t.sleep(.5)
 
-        setDoorState(2, "OPEN")  # open door to next room
+        play_audio("quarterdeck", "Horrific_1.wav", gain=1)
 
         for i in range(4):
             if BreakCheck():
                 break
             t.sleep(1)
 
-        for i in range(6):  
+        #setDoorState(2, "OPEN")  # open door to next room
+
+        for i in range(20):  
             bulb_lightning(
                     23, 
                     flash_ms=100, 
@@ -93,7 +110,7 @@ def run():
                 break
             t.sleep(1)
 
-        setDoorState(2, "CLOSED")  # close door to next room
+        #setDoorState(2, "CLOSED")  # close door to next room
 
         m1Digital_Write(9,1)  # strobe off
         log_event("[quarterdeck] Strobe OFF")
@@ -107,6 +124,23 @@ def run():
 
     house.quarterdeck_state = "INACTIVE"
     log_event("[Quaterdeck] Exiting.")
+
+def prisonerArms(threaded=False):
+    log_event("[quarterdeck] Starting prisoner arms...")
+    def main():
+        while house.HouseActive or house.Demo:
+            m1Digital_Write(53, 0) #prisoner arms
+            t.sleep(random.uniform(.1, 1))
+            m1Digital_Write(53, 1) #prisoner arms
+            t.sleep(random.uniform(.1, 1))
+            if BreakCheck():
+                return
+
+    if threaded:
+        threading.Thread(target=main, daemon=True, name="prisoner arms").start()
+    else:
+        main()
+
 
 def dropDownFlash(loops, threaded=True):
     def main():

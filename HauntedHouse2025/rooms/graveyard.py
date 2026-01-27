@@ -11,13 +11,34 @@ from control.arduino import m1Digital_Write
 from control import cannons
 from control import remote_sensor_monitor as rsm
 from control.houseLights import toggleHouseLights
+import wave, contextlib
+from pathlib import Path
 
 Scripted_Event = False
+
+DEFAULT_SOUND_DIR = (Path(__file__).resolve().parents[3] / "Assets" / "SoundDir").resolve()
+
+# ---------- duration helpers (cached) ----------
+_DURATION_CACHE: dict[str, float] = {}
+
+def _wav_seconds(filename: str, folder: Path = DEFAULT_SOUND_DIR) -> float | None:
+    """Return duration (s) of a WAV in DEFAULT_SOUND_DIR. Caches results. None on error."""
+    if filename in _DURATION_CACHE:
+        return _DURATION_CACHE[filename]
+    try:
+        p = (folder / filename)
+        with contextlib.closing(wave.open(str(p), "rb")) as wf:
+            secs = wf.getnframes() / float(wf.getframerate())
+            _DURATION_CACHE[filename] = secs
+            return secs
+    except Exception:
+        # Missing/invalid → unknown; when close to target we conservatively exclude it
+        return None
 
 def run():
     log_event("[Graveyard] Starting...")
 
-    #threading.Thread(target=steeringWheel, daemon=True, name="Steering Wheel").start()
+    threading.Thread(target=steeringWheel, daemon=True, name="Steering Wheel").start()
 
     while house.HouseActive or house.Demo:
         log_event("[Graveyard] Running loop...")
@@ -67,26 +88,39 @@ def run():
         if BreakCheck():
             return'''
         
-        while True:
+        '''while True:
             m1Digital_Write(31,0)
             t.sleep(7)
             m1Digital_Write(31,1)
             t.sleep(7)
-            '''cannons.fire_cannon(3)
-            for i in range(10):
-                t.sleep(1)'''
             if BreakCheck():
-                return
-
-        #MedallionCallsEvent()
-
-        #t.sleep(30)
+                return'''
+        
+        threading.Thread(target=randCannonsIdle, daemon=True, name="random cannons idle").start()
+        #idleMusic(min_idle_time=random.randint(300,400)) #10-15 mins
+        m1Digital_Write(8, 0) # deck ambient ON
+        #idleMusic2()
+        m1Digital_Write(8, 0) # deck ambient ON
+        if BreakCheck():
+            return
+        m1Digital_Write(8, 0) # deck ambient ON
+        MedallionCallsEvent()
+        m1Digital_Write(8, 0) # deck ambient ON
+        threading.Thread(target=randCannonsIdle, daemon=True, name="random cannons idle").start()
+        #idleMusic(min_idle_time=210) #3.5 mins
+        #idleMusic2()
+        m1Digital_Write(8, 0) # deck ambient ON
+        if BreakCheck():
+            return
 
         BeckettsDeathEvent()
 
+        if BreakCheck():
+            return
+
         #testEvent()
 
-        #idleMusic()
+        
 
         if BreakCheck() or house.Demo: # end on breakCheck or if demo'ing
             if house.Demo:
@@ -97,19 +131,198 @@ def run():
 
     log_event("[Graveyard] Exiting.")
 
-def idleMusic():
+def cannonsButton():
+    while not rsm.get_button_value("BTN2"):
+        t.sleep(.05)
+        if BreakCheck():
+            return
+        
+def waterBlast(duration=2, threaded=False):
+    audio_files = [
+        "splash1.wav",
+        "splash2.wav",
+        "splash3.wav"
+    ]
+    def main():
+        audio = random.choice(audio_files)
+        play_audio("graveyard", audio, gain=.7)
+        t.sleep(.1)
+        m1Digital_Write(40,0)
+        t.sleep(duration)
+        m1Digital_Write(40,1)
+
+    if threaded:
+        threading.Thread(target=main, daemon=True, name="water blast").start()
+    else:
+        main()
+
+def idleMusic2():
     audio_files = [
         "piratesLifeForMe.wav",
         "DavyJones.wav",
         "DontThinkNowBestTime.wav",
         "FamilyAffair.wav",
-        "GuiltyJackSparrow.wav"
+        "GuiltyJackSparrow.wav",
+        # highlighted additions
+        "bloodRitual.wav",
+        "bootstrapsBootstraps.wav",
+        "moonlightSerenade.wav",
+        "spanishSuite.wav",
+        "theKraken.wav",
+        "walkThePlank.wav",
+        "hesaPirate.wav",
+        "toThePiratesCave.wav"
     ]
     audio = random.choice(audio_files)
-    play_audio("graveyard", audio, gain=.4, threaded=False)
-    log_event(f"Playing Idle music {audio}")
+    play_audio("graveyard", audio, gain=1, threaded=False)
 
+def idleMusic(min_idle_time: float = 0, buffer_seconds: int = 180):
+    """
+    Plays back-to-back songs until total >= min_idle_time (never mid-track).
+    - Probes durations for all listed files in DEFAULT_SOUND_DIR (no hardcoding).
+    - Near target (remaining <= buffer_seconds), only picks songs whose duration
+      fits within remaining + buffer_seconds.
+    - Never repeats the same song twice in a row.
+    - If only viable pick equals last-played, choose the second-shortest song overall.
+    - Non-threaded; loop exits cleanly on BreakCheck().
+    """
+    audio_files = [
+        "piratesLifeForMe.wav",
+        "DavyJones.wav",
+        "DontThinkNowBestTime.wav",
+        "FamilyAffair.wav",
+        "GuiltyJackSparrow.wav",
+        # highlighted additions
+        "bloodRitual.wav",
+        "bootstrapsBootstraps.wav",
+        "moonlightSerenade.wav",
+        "spanishSuite.wav",
+        "theKraken.wav",
+        "walkThePlank.wav",
+        "hesaPirate.wav",
+        "toThePiratesCave.wav"
+    ]
+
+    # Probe durations (best-effort) from DEFAULT_SOUND_DIR
+    durations: dict[str, float | None] = {f: _wav_seconds(f, DEFAULT_SOUND_DIR) for f in audio_files}
+
+    total_elapsed = 0.0
+    last_played: str | None = None
+
+    def _second_shortest(files: list[str]) -> str:
+        """Pick second-shortest by known duration; unknowns sorted to end."""
+        ranked = sorted(
+            ((f, durations.get(f) if durations.get(f) is not None else float("inf")) for f in files),
+            key=lambda x: (x[1], x[0]),
+        )
+        if len(ranked) >= 2:
+            return ranked[1][0]
+        return ranked[0][0]
+
+    while (house.HouseActive or house.Demo) and not BreakCheck():
+        remaining = max(0.0, float(min_idle_time) - total_elapsed)
+
+        # When far from target → allow all. When close → only tracks that "fit".
+        def allowed(f: str) -> bool:
+            d = durations.get(f)
+            if remaining > buffer_seconds:
+                return True
+            if d is None:
+                # Unknown length when close → be conservative and exclude
+                return False
+            return d <= (remaining + buffer_seconds)
+
+        candidates = [f for f in audio_files if allowed(f)]
+        if not candidates:
+            # If nothing "fits", fall back to full list to avoid stalling
+            candidates = audio_files[:]
+
+        # Avoid repeating the last track if we can
+        non_repeat = [f for f in candidates if f != last_played]
+        if non_repeat:
+            pick_from = non_repeat
+        else:
+            # Only viable pick equals last_played → choose second-shortest overall
+            pick_from = [_second_shortest(audio_files)]
+
+        if BreakCheck():
+            break
+
+        audio = random.choice(pick_from)
+
+        # Play one track (blocking). Your audio manager will stop audio if BreakCheck() flips elsewhere.
+        start = t.time()
+        play_audio("graveyard", audio, gain=0.4, threaded=False)
+        elapsed = t.time() - start
+
+        total_elapsed += elapsed
+        last_played = audio
+
+        log_event(
+            f"[idleMusic] Played {audio} "
+            f"(track: {elapsed:.2f}s, total: {total_elapsed:.2f}s, "
+            f"remaining: {max(0.0, min_idle_time - total_elapsed):.2f}s)"
+        )
+
+        # Exit after finishing the current track if target reached or break requested
+        if BreakCheck() or total_elapsed >= min_idle_time:
+            break
+
+
+def cannonsButton_loop():
+    def cannonsButton(long_press_ms: int = 600, debounce_ms: int = 40):
+        """
+        Waits for BTN2 press+release, then:
+        - short press  -> fire random cannon (1 or 2)
+        - long press   -> fire cannon 1, wait 2s, fire cannon 2
+        Returns after acting once (non-looping). Aborts early if BreakCheck() is True.
+        """
+
+        # Wait for a *new* press (rising edge)
+        while True:
+            if BreakCheck():
+                return
+            if rsm.get_button_value("BTN2"):          # pressed
+                # measure hold duration until release
+                t0 = t.time()
+                while rsm.get_button_value("BTN2"):
+                    if BreakCheck():
+                        return
+                    t.sleep(0.01)
+
+                # basic release debounce
+                t.sleep(debounce_ms / 1000.0)
+
+                held_s = t.time() - t0
+                if held_s >= (long_press_ms / 1000.0):
+                    # LONG PRESS: fire 1, then 2 after 2s
+                    cannons.fire_cannon(1)
+
+                    # Wait 2 seconds unless BreakCheck trips
+                    end_wait = t.time() + 2.0
+                    while t.time() < end_wait:
+                        if BreakCheck():
+                            return
+                        t.sleep(0.05)
+
+                    cannons.fire_cannon(2)
+                else:
+                    # SHORT PRESS: fire a single random cannon
+                    cannons.fire_cannon(random.choice([1, 2]))
+
+                return  # done after one action
+
+            # idle polling
+            t.sleep(0.01)
+
+    while not BreakCheck():
+        if not Scripted_Event:
+            cannonsButton()  # handles one press + action
+            t.sleep(0.05)
+        else:
+            t.sleep(5)
     
+
 def idleEvent():
     while house.HouseActive or house.Demo:
         cannons.fire_cannon(1)
@@ -130,6 +343,10 @@ def BeckettsDeathEvent():
     global Scripted_Event 
     Scripted_Event = True
 
+    dim(100)
+    t.sleep(1)
+    dim(0)
+
     m1Digital_Write(6, 0) # ship lights ON
     log_event("[graveyard] Ship Lights ON")
     m1Digital_Write(7, 0)
@@ -148,7 +365,18 @@ def BeckettsDeathEvent():
         
     cannons.fire_cannon(3)
     
-    for i in range(8):
+    for i in range(2):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    play_audio("graveyard", "waterWave01.wav", gain=.7)
+
+    t.sleep(.8)
+    waterBlast(duration=2, threaded=True)
+    t.sleep(.2)
+
+    for i in range(5):
         t.sleep(1)
         if BreakCheck():
             return
@@ -165,10 +393,20 @@ def BeckettsDeathEvent():
     threading.Thread(target=randCannons, daemon=True, name="rand cannons initiator").start() #just ship cannons
     cannons.fire_cannon(3)
 
-    for i in range(20):
+    for i in range(2):
         t.sleep(1)
         if BreakCheck():
             return
+        
+    t.sleep(.8)
+    waterBlast(duration=2, threaded=True)
+        
+    for i in range(17):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    t.sleep(.2)
     
     cannons.fire_cannon(3)
 
@@ -197,10 +435,22 @@ def BeckettsDeathEvent():
 
     dimmer_flicker(104, 20, 80, 0.05, 0.18, True)  # fire lights flicker
 
-    for i in range(27):
+    for i in range(2):
         t.sleep(1)
         if BreakCheck():
             return
+    
+    play_audio("graveyard", "waterWave02.wav", gain=.7)
+
+    t.sleep(.8)
+    waterBlast(duration=2, threaded=True)
+        
+    for i in range(24):
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    t.sleep(.2)
     
     cannons.fire_cannon(3)
 
@@ -312,7 +562,7 @@ def BeckettsDeathEvent():
 
     log_event("GraveyardScene2v3part2 STARTED")
 
-    play_audio("graveyard", "GraveyardScene2v3part2.wav", gain=.5, threaded=False)
+    play_audio("graveyard", "GraveyardScene2v3part2.wav", gain=.4, threaded=False)
 
     log_event("GraveyardScene2v3part2 ENDED")
     m1Digital_Write(59, 1) #smoke machine
@@ -365,6 +615,10 @@ def MedallionCallsEvent():
     Scripted_Event = True
     
     log_event("[Graveyard] Medallion Calls Event Starting...")
+
+    dim(100)
+    t.sleep(1)
+    dim(0)
     
     play_audio("graveyard", "TheMedallionCalls.wav", gain=.2)
         
@@ -386,14 +640,13 @@ def MedallionCallsEvent():
         t.sleep(1)
         if BreakCheck():
             return
-    
+            
     play_audio("graveyard", "waterWave01.wav", gain=.7)
     t.sleep(.8)
     m1Digital_Write(59,0) #smoke machine
     log_event("[graveyard] Smoke Machine ON")
     flickerAmbientLights(12, threaded=True)
     m1Digital_Write(43, 0) # mast
-    m1Digital_Write(43, 1) # mast
     play_audio("graveyard", "impactDebris01.wav", gain=.5)
         
     for i in range(4):  # 28.8
@@ -424,10 +677,21 @@ def MedallionCallsEvent():
     cannons.fire_cannon(3)
     
     t.sleep(.2)
-    for i in range(4):  # 42
+    for i in range(2):  # 42
         t.sleep(1)
         if BreakCheck():
             return
+    
+    play_audio("graveyard", "waterWave01.wav", gain=.7)
+
+    t.sleep(.8)
+    waterBlast(2, threaded=True)
+
+    for i in range(1):  # 42
+        t.sleep(1)
+        if BreakCheck():
+            return
+    t.sleep(.2)
     
     flickerAmbientLights(4, threaded=True)
     play_audio("graveyard", "waterWave02.wav", gain=1)
@@ -475,7 +739,14 @@ def MedallionCallsEvent():
     fireLightsSmoke(2, threaded=True) 
     play_audio("graveyard", "waterWave01.wav", gain=1)
     
-    for i in range(5):  # 65
+    for i in range(1):  # 65
+        t.sleep(1)
+        if BreakCheck():
+            return
+        
+    waterBlast(duration=2, threaded=True)
+        
+    for i in range(4):  # 65
         t.sleep(1)
         if BreakCheck():
             return
@@ -672,6 +943,22 @@ def randCannons():
         cannons.fire_cannon(random.randint(1,2))
         t.sleep(random.uniform(20, 30))
 
+def randCannonsIdle():
+    while not Scripted_Event and house.HouseActive:
+        
+        for i in range(random.randint(60, 100)):
+            t.sleep(1)
+            if BreakCheck() or Scripted_Event:
+                return
+
+        cannons.fire_cannon(1)
+
+        for i in range(random.randint(60, 100)):
+            t.sleep(1)
+            if BreakCheck() or Scripted_Event:
+                return
+
+        cannons.fire_cannon(2)
 
 def testEvent():
     global Scripted_Event 
@@ -824,7 +1111,7 @@ def lightning_bolt(threaded=False):
 
         audio =  random.choice(audioFiles)
 
-        play_audio("graveyard", audio, gain=1)
+        play_audio("graveyard", audio, gain=.8)
 
         m1Digital_Write(32, 0)  # Deck strobe
 

@@ -7,6 +7,7 @@ from control import dimmer_controller as dim
 from control.arduino import m1Digital_Write
 import random, threading
 from control.houseLights import toggleHouseLights
+from control import remote_sensor_monitor as rsm
 
 def run():
     log_event("[treasureRoom] Starting...")
@@ -16,13 +17,15 @@ def run():
     log_event("[treasureRoom] Ambient light ON")
     play_audio("treasureRoom", "treasureRoomAmbience.wav", gain=.7, looping=True)
 
+    threading.Thread(target=sailorsLeg, daemon=True, name="Sailor's Leg").start()
+
     while house.HouseActive or house.Demo:
         log_event("[treasureRoom] Running loop...")
 
         play_audio("treasureRoom", "treasureRoomVoices.wav", gain=.7)
 
-        for i in range(10):
-            t.sleep(1)
+        while not rsm.get_button_value("BTN4"):
+            t.sleep(.05)
             if BreakCheck():
                 return
         
@@ -57,3 +60,16 @@ def run():
 
     house.treasureRoom_state = "INACTIVE"
     log_event("[treasureRoom] Exiting.")
+
+
+def sailorsLeg():
+    while house.HouseActive or house.Demo:
+        m1Digital_Write(24,0)
+        t.sleep(2)
+        if BreakCheck():
+            return
+        m1Digital_Write(24,1)
+        t.sleep(2)
+        if BreakCheck():
+            return
+        

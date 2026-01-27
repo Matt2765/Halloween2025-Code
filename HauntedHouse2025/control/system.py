@@ -73,7 +73,9 @@ def StartHouse():
 
         setDoorState(1, "CLOSED")
         setDoorState(2, "CLOSED")
+        t.sleep(1)
         toggleHouseLights(False)
+        setDoorState(2, "OPEN")
 
         threading.Thread(
             target=graveyard.run, 
@@ -129,7 +131,7 @@ def StartHouse():
 def shipAmbience():
     log_event("Playing ship ambience in cargoHold, gangway, and quarterdeck.")
     play_audio("cargoHold", "shipAmbienceCUT.wav", gain=1, looping=True)
-    play_audio("gangway", "shipAmbienceCUT.wav", gain=1, looping=True)
+    play_audio("gangway", "shipAmbienceCUT.wav", gain=.8, looping=True)
     play_audio("quarterdeck", "shipAmbienceCUT.wav", gain=1, looping=True)
 
 def noScareDetector(threaded=False):
@@ -153,13 +155,13 @@ def noScareDetector(threaded=False):
             if BreakCheck():
                 return
 
-        t.sleep(1)
+        t.sleep(3)
 
         while not remote_sensor_monitor.get_button_value("BTN3"):
             audio = random.choice(no_scare_files)
-            play_audio(audio, threaded=True)
+            play_audio(audio, threaded=True, gain=1.5)
 
-            for i in range(300): #15 secs
+            for i in range(200): #15 secs
                 if remote_sensor_monitor.get_button_value("BTN3"):
                     break
                 t.sleep(.05)

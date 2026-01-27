@@ -33,7 +33,7 @@ from utils.tools import log_event, BreakCheck
 
 # Set your exact device indexes (use list_output_devices())
 PRIMARY_DEVICE_INDEX: Optional[int] = 3      # HDMI / AVR device
-SECONDARY_DEVICE_INDEX: Optional[int] = 5   # USB 7.1 soundcard
+SECONDARY_DEVICE_INDEX: Optional[int] = 6   # USB 7.1 soundcard
 FALLBACK_TO_SYSTEM_DEFAULT = True            # fallback if stream open fails
 
 # Primary (HDMI) channels

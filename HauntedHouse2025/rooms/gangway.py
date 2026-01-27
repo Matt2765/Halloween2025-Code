@@ -64,7 +64,7 @@ def run():
 def deadMenTellNoTalesLoop(threaded=True):
     def main():
         while house.HouseActive or house.Demo:
-            play_audio("gangway", "deadMenTellNoTales.wav", gain=1)
+            play_audio("gangway", "deadMenTellNoTales.wav", gain=.7)
             t.sleep(10)
             if BreakCheck():
                 return

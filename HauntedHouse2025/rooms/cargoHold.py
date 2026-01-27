@@ -81,8 +81,8 @@ def brig():
         log_event("[cargoHold] Filipe ambient ON")
         
 
-        while not rsm.get_button_value("BTN4"):
-            t.sleep(.05)
+        for i in range(30):
+            t.sleep(1)
             if BreakCheck():
                 return
         
