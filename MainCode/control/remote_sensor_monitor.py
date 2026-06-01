@@ -263,6 +263,8 @@ from typing import Dict, Any, Optional, List, Tuple, Union
 import multiprocessing as mp
 from multiprocessing.managers import SyncManager
 from collections import deque
+from utils.tools import log_event
+from context import house
 
 # ---- Serial deps ----
 try:
@@ -288,6 +290,7 @@ _manager: Optional[SyncManager] = None
 _proc: Optional[mp.Process] = None
 _shared: Optional[Dict[str, dict]] = None
 _started: bool = False
+_disabled: bool = False
 
 # TX queue to child (for PC -> receiver writes)
 _txq: Optional[mp.Queue] = None
@@ -473,9 +476,20 @@ def _monitor_main(shared: "dict[str, dict]", port: Optional[str], baud: int,
             backoff = BACKOFF_START_S
 
 # ---------- Public API ----------
+def set_disabled(disabled: bool = True) -> None:
+    """Disable hardware serial monitoring and simulate outbound commands."""
+    global _disabled
+    _disabled = bool(disabled)
+    if _disabled:
+        stop()
+        log_event("[RemoteSensorMonitor] Disabled; using safe defaults and simulated TX.")
+
 def init(port: Optional[str]=None, baud: int=DEFAULT_BAUD) -> None:
     """Start the background monitor (idempotent) and TX channel."""
     global _manager, _proc, _shared, _started, _txq, _btnq
+    set_disabled(house.DISABLE_REMOTE_SENSOR_MONITOR)
+    if _disabled:
+        return
     if _started and _proc and _proc.is_alive():
         return
     if _manager is None:
@@ -498,11 +512,15 @@ def stop() -> None:
     _proc = None
 
 def get(sensor_id: str) -> Optional[dict]:
+    if _disabled:
+        return None
     if not _shared:
         return None
     return _shared.get(sensor_id)
 
 def get_value(sensor_id: str, key: str, default: Any=None, max_age_ms: Optional[int]=STALE_DEFAULT_MS) -> Any:
+    if _disabled:
+        return default
     rec = get(sensor_id)
     if not rec:
         return default
@@ -529,9 +547,11 @@ def get_latency_ms(sensor_id: str) -> Optional[int]:
     return max(0, t_rx - t_send)
 
 def healthy() -> dict:
+    if _disabled:
+        return {"started": False, "disabled": True, "sensors": 0, "since_ms": None}
     if not _shared:
-        return {"started": _started, "sensors": 0, "since_ms": None}
-    return {"started": _started, "sensors": len(_shared.keys()), "since_ms": _now_ms()}
+        return {"started": _started, "disabled": False, "sensors": 0, "since_ms": None}
+    return {"started": _started, "disabled": False, "sensors": len(_shared.keys()), "since_ms": _now_ms()}
 
 # ---------- TX helpers (PC -> receiver -> ESP-NOW) ----------
 def _json_str(payload: Union[str, dict]) -> str:
@@ -541,16 +561,25 @@ def _json_str(payload: Union[str, dict]) -> str:
 
 def tx_broadcast(payload: Union[str, dict]) -> None:
     """Broadcast a JSON payload: receiver sends 'TXB <JSON>\\n'."""
+    if _disabled:
+        log_event(f"[RemoteSensorMonitor] (Simulated) TXB {_json_str(payload)}")
+        return
     if not _txq: raise RuntimeError("call init() first")
     _txq.put(('TXB', None, _json_str(payload)))
 
 def tx_to_id(device_id: str, payload: Union[str, dict]) -> None:
     """Unicast by ID (receiver resolves ID->MAC): 'TX <ID> <JSON>\\n'."""
+    if _disabled:
+        log_event(f"[RemoteSensorMonitor] (Simulated) TX {device_id} {_json_str(payload)}")
+        return
     if not _txq: raise RuntimeError("call init() first")
     _txq.put(('TX', device_id, _json_str(payload)))
 
 def tx_to_mac(mac: str, payload: Union[str, dict]) -> None:
     """Unicast to a MAC: 'TXMAC <mac> <JSON>\\n'."""
+    if _disabled:
+        log_event(f"[RemoteSensorMonitor] (Simulated) TXMAC {mac} {_json_str(payload)}")
+        return
     if not _txq: raise RuntimeError("call init() first")
     _txq.put(('TXMAC', mac, _json_str(payload)))
 
@@ -611,6 +640,8 @@ def sprite_play(device_id: str, index: int) -> None:
 
 # ---------- Snapshot / formatting / watch ----------
 def snapshot() -> Dict[str, dict]:
+    if _disabled:
+        return {}
     return dict(_shared) if _shared else {}
 
 def _format_row(sid: str, rec: dict, now_ms: int) -> Tuple:
@@ -772,6 +803,8 @@ def obstructed(sid: str, block_mm: int,
                min_consecutive: int=2,
                ignore_neg1: bool=True,
                require_status_zero: bool=False) -> bool:
+    if _disabled:
+        return False
     h = _hist_update(sid, window_ms, ignore_neg1=ignore_neg1, require_status_zero=require_status_zero)
     q = h['q']
     if clear_mm is None:
@@ -795,6 +828,8 @@ def obstructed(sid: str, block_mm: int,
 # ---------- Button event FIFO ----------
 def button_pop(timeout: float=0.0) -> Optional[dict]:
     """Pop the next button edge event, or None if empty (timeout seconds)."""
+    if _disabled:
+        return None
     if not _btnq:
         return None
     try:
@@ -813,6 +848,9 @@ def get_button_value(device_id: str, btn_num: int | None = None) -> Optional[boo
         False -> button currently released
         None  -> no data yet or button never seen
     """
+    if _disabled:
+        return False
+
     rec = get(device_id)
     if not rec:
         return None

@@ -356,7 +356,7 @@ def BeckettsDeathEvent():
     log_event("[graveyard] Deck Ambient Lights ON")
     
     log_event("[Graveyard] Beckett's Death Event Starting...")
-    play_audio("graveyard", "GraveyardScene2v3part1.wav", gain=.2, threaded=True)
+    play_audio("graveyard", "GraveyardScene2v3part1.wav", gain=1, threaded=True)
     
     for i in range(58):
         t.sleep(1)
@@ -620,7 +620,7 @@ def MedallionCallsEvent():
     t.sleep(1)
     dim(0)
     
-    play_audio("graveyard", "TheMedallionCalls.wav", gain=.2)
+    play_audio("graveyard", "TheMedallionCalls.wav", gain=1)
         
     for i in range(17):
         t.sleep(1)
@@ -799,7 +799,7 @@ def MedallionCallsEvent():
         if BreakCheck():
             return
     
-    play_audio("graveyard", "OneLastShotEdited.wav", gain=.6)
+    play_audio("graveyard", "OneLastShotEdited.wav", gain=1)
 
     for i in range(7):
         t.sleep(1)

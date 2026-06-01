@@ -279,7 +279,7 @@ def _open_stream_robust(fs: int, have_channels: int, device_index: int, device_n
       - If the device is WASAPI: try exclusive -> shared at requested fs
       - Otherwise: open generic shared at the DEVICE DEFAULT fs
       - Optional fallback to system default
-    Returns (stream, used_fs)
+    Returns (stream, used_fs, used_channels, fallback_to_all)
     """
     hostapi = _device_hostapi_name(device_index).lower()
     blocksize = max(512, fs // 25)
@@ -292,12 +292,12 @@ def _open_stream_robust(fs: int, have_channels: int, device_index: int, device_n
                 return None
         return None
 
-    def _try(idx, ex, use_fs, note):
-        log_event(f"[Audio] Opening idx={idx} '{device_name}', fs={use_fs}, ch={have_channels}, note={note}")
+    def _try(idx, ex, use_fs, channels, name, note):
+        log_event(f"[Audio] Opening idx={idx} '{name}', fs={use_fs}, ch={channels}, note={note}")
         return sd.OutputStream(
             samplerate=use_fs,
             device=idx,
-            channels=have_channels,
+            channels=channels,
             dtype="float32",
             blocksize=blocksize,
             latency=0.06,
@@ -308,27 +308,32 @@ def _open_stream_robust(fs: int, have_channels: int, device_index: int, device_n
         try:
             ex = _mk_wasapi(True)
             if ex:
-                return _try(device_index, ex, fs, "WASAPI exclusive"), fs
+                return _try(device_index, ex, fs, have_channels, device_name, "WASAPI exclusive"), fs, have_channels, False
         except Exception as e:
             log_event(f"[Audio] Fail WASAPI exclusive: {e}")
         try:
             ex = _mk_wasapi(False)
-            return _try(device_index, ex, fs, "WASAPI shared"), fs
+            return _try(device_index, ex, fs, have_channels, device_name, "WASAPI shared"), fs, have_channels, False
         except Exception as e:
             log_event(f"[Audio] Fail WASAPI shared: {e}")
 
     try:
         dev_default_fs = int(round(float(sd.query_devices()[device_index].get("default_samplerate", fs))))
-        return _try(device_index, None, dev_default_fs, "generic shared"), dev_default_fs
+        return _try(device_index, None, dev_default_fs, have_channels, device_name, "generic shared"), dev_default_fs, have_channels, False
     except Exception as e:
         log_event(f"[Audio] Fail generic shared: {e}")
 
     if FALLBACK_TO_SYSTEM_DEFAULT:
         try:
             _, def_out = sd.default.device  # (input, output)
-            def_fs = int(round(float(sd.query_devices()[def_out].get("default_samplerate", fs))))
-            log_event(f"[Audio] Falling back to system default idx={def_out}")
-            return _try(def_out, None, def_fs, "system default fallback"), def_fs
+            def_dev = sd.query_devices()[def_out]
+            def_name = def_dev.get("name", "System Default")
+            def_channels = int(def_dev.get("max_output_channels", 0))
+            if def_channels <= 0:
+                raise RuntimeError(f"System default output has no output channels: idx={def_out}")
+            def_fs = int(round(float(def_dev.get("default_samplerate", fs))))
+            log_event(f"[Audio] Falling back to system default idx={def_out}; playing on all {def_channels} channel(s)")
+            return _try(def_out, None, def_fs, def_channels, def_name, "system default fallback all"), def_fs, def_channels, True
         except Exception as e:
             log_event(f"[Audio] System default fallback failed: {e}")
 
@@ -358,14 +363,16 @@ def _play_pcm_nonblocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
     def _worker():
         stream = None
         try:
-            stream, used_fs = _open_stream_robust(fs, have_channels, dev_idx, dev_name)
+            stream, used_fs, output_channels, fallback_to_all = _open_stream_robust(fs, have_channels, dev_idx, dev_name)
+            playback_mode = "all" if fallback_to_all else mode
+            playback_idx_or_pair = 0 if fallback_to_all else idx_or_pair
             pcm_res, _ = _ensure_samplerate(pcm, fs, used_fs)
             with stream:
                 with _active_lock:
                     _active_streams.append(stream)
                     _active_sessions.append(session)
                 blocksize = stream.blocksize or max(512, used_fs // 25)
-                zero_blk = np.zeros((blocksize, have_channels), np.float32)
+                zero_blk = np.zeros((blocksize, output_channels), np.float32)
                 stream.write(zero_blk)
                 n = pcm_res.shape[0]
                 src_ch = pcm_res.shape[1]
@@ -380,25 +387,25 @@ def _play_pcm_nonblocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
                     end = min(pos + blocksize, n)
                     block = pcm_res[pos:end] * gain  # (B, Csrc)
 
-                    # Build output frame (B, have_channels)
-                    if have_channels <= 1:
+                    # Build output frame (B, output_channels)
+                    if output_channels <= 1:
                         out = block[:, :1]
-                    elif have_channels == 2:
-                        if mode == "stereo":
+                    elif output_channels == 2:
+                        if playback_mode == "stereo":
                             out = np.column_stack((block[:, 0], block[:, 0])) if src_ch == 1 else block[:, :2]
-                        elif mode == "all":
+                        elif playback_mode == "all":
                             mono = block[:, 0:1]
                             out = np.concatenate([mono, mono], axis=1)
                         else:
                             out = np.column_stack((block[:, 0], block[:, 0]))
                     else:
-                        if mode == "all":
+                        if playback_mode == "all":
                             mono = block[:, 0:1]  # use L/mono
-                            out = np.repeat(mono, have_channels, axis=1)
+                            out = np.repeat(mono, output_channels, axis=1)
                         else:
-                            out = np.zeros((block.shape[0], have_channels), np.float32)
-                            if mode == "stereo":
-                                L, R = int(idx_or_pair[0]), int(idx_or_pair[1])
+                            out = np.zeros((block.shape[0], output_channels), np.float32)
+                            if playback_mode == "stereo":
+                                L, R = int(playback_idx_or_pair[0]), int(playback_idx_or_pair[1])
                                 if src_ch == 1:
                                     out[:, L] = block[:, 0]
                                     out[:, R] = block[:, 0]
@@ -406,7 +413,7 @@ def _play_pcm_nonblocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
                                     out[:, L] = block[:, 0]
                                     out[:, R] = block[:, 1]
                             else:
-                                idx = min(int(idx_or_pair), have_channels - 1)
+                                idx = min(int(playback_idx_or_pair), output_channels - 1)
                                 out[:, idx] = block[:, 0]
 
                     stream.write(out)
@@ -439,14 +446,16 @@ def _play_pcm_blocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
     """
     stream = None
     try:
-        stream, used_fs = _open_stream_robust(fs, have_channels, dev_idx, dev_name)
+        stream, used_fs, output_channels, fallback_to_all = _open_stream_robust(fs, have_channels, dev_idx, dev_name)
+        playback_mode = "all" if fallback_to_all else mode
+        playback_idx_or_pair = 0 if fallback_to_all else idx_or_pair
         pcm_res, _ = _ensure_samplerate(pcm, fs, used_fs)
         with stream:
             n = pcm_res.shape[0]
             src_ch = pcm_res.shape[1]
             pos = 0
             blocksize = stream.blocksize or max(512, used_fs // 25)
-            zero_blk = np.zeros((blocksize, have_channels), np.float32)
+            zero_blk = np.zeros((blocksize, output_channels), np.float32)
             stream.write(zero_blk)
             while True:
                 if honor_breakcheck and BreakCheck():
@@ -456,24 +465,24 @@ def _play_pcm_blocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
                 end = min(pos + blocksize, n)
                 block = pcm_res[pos:end] * gain
 
-                if have_channels <= 1:
+                if output_channels <= 1:
                     out = block[:, :1]
-                elif have_channels == 2:
-                    if mode == "stereo":
+                elif output_channels == 2:
+                    if playback_mode == "stereo":
                         out = np.column_stack((block[:, 0], block[:, 0])) if src_ch == 1 else block[:, :2]
-                    elif mode == "all":
+                    elif playback_mode == "all":
                         mono = block[:, 0:1]
                         out = np.concatenate([mono, mono], axis=1)
                     else:
                         out = np.column_stack((block[:, 0], block[:, 0]))
                 else:
-                    if mode == "all":
+                    if playback_mode == "all":
                         mono = block[:, 0:1]
-                        out = np.repeat(mono, have_channels, axis=1)
+                        out = np.repeat(mono, output_channels, axis=1)
                     else:
-                        out = np.zeros((block.shape[0], have_channels), np.float32)
-                        if mode == "stereo":
-                            L, R = int(idx_or_pair[0]), int(idx_or_pair[1])
+                        out = np.zeros((block.shape[0], output_channels), np.float32)
+                        if playback_mode == "stereo":
+                            L, R = int(playback_idx_or_pair[0]), int(playback_idx_or_pair[1])
                             if src_ch == 1:
                                 out[:, L] = block[:, 0]
                                 out[:, R] = block[:, 0]
@@ -481,7 +490,7 @@ def _play_pcm_blocking(pcm: np.ndarray, fs: int, dev_idx: int, dev_name: str,
                                 out[:, L] = block[:, 0]
                                 out[:, R] = block[:, 1]
                         else:
-                            idx = min(int(idx_or_pair), have_channels - 1)
+                            idx = min(int(playback_idx_or_pair), output_channels - 1)
                             out[:, idx] = block[:, 0]
 
                 stream.write(out)

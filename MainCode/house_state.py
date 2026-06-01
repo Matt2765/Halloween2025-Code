@@ -24,3 +24,4 @@ class HouseState:
 
         self.DEBUG_INFO = False
         self.DEBUG_BREAKCHECK = True
+        self.DISABLE_REMOTE_SENSOR_MONITOR = True # set to true if you want to avoid spam when esp32 disconnected

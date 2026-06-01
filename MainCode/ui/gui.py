@@ -40,7 +40,7 @@ def MainGUI():
 
     root = tk.Tk()
     root.configure(background="orange")
-    root.title("Halloween 2025 Control Panel")
+    root.title("Halloween [year] Control Panel")
     root.geometry("465x1080")
 
     tk.Label(root, text="MAINS", font=("Helvetica bold", 15), bg="orange").place(x=25, y=15)
@@ -76,7 +76,7 @@ def MainGUI():
     tk.Button(root, text=f"Demo {cargoHold.__name__.split('.')[-1]}", height=2, width=15,
               command=lambda: demoEvent(cargoHold.__name__.split('.')[-1])).place(x=150, y=480)
 
-    tk.Button(root, text="Start Testing", height=2, width=15, command=None).place(x=25, y=570)
+    tk.Button(root, text="Start Testing [coming soon]", height=2, width=15, command=None).place(x=25, y=570)
     tk.Button(root, text="Toggle House Lights", height=3, width=25, bg="chartreuse2",
               command=toggleHouseLights).place(x=250, y=125)
 

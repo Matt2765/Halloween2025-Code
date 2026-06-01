@@ -11,7 +11,7 @@ import time, random, threading, re, math
 from collections import deque
 from typing import Optional
 import serial
-from utils.tools import BreakCheck
+from utils.tools import BreakCheck, log_event
 
 # ----------------------------
 # Hardcoded defaults (requested)
@@ -35,6 +35,8 @@ _RAMP_DT = 1.0 / _RAMP_HZ
 # Serial + state
 # ----------------------------
 _ser: Optional[serial.Serial] = None
+_simulated = False
+_suppress_simulated_set_logs = False
 _lock = threading.Lock()
 _last_send_ts: float = 0.0
 _last_send_ok_ts: float = 0.0
@@ -177,6 +179,9 @@ def _stop_rx_thread(join: bool = True):
 
 def _wait_for_ack(prev_count: int, timeout_s: float) -> bool:
     """Wait until _ack_counter increases beyond prev_count."""
+    if _simulated:
+        return True
+
     deadline = time.monotonic() + timeout_s
     with _ack_cv:
         while time.monotonic() < deadline:
@@ -192,8 +197,6 @@ def _wait_for_ack(prev_count: int, timeout_s: float) -> bool:
 def _writeln(line: str) -> bool:
     """Safe, rate-limited, non-blocking write. Returns True on success."""
     global _last_send_ts, _last_send_ok_ts
-    if _ser is None:
-        raise RuntimeError("dimmer.init() must be called first.")
 
     # Rate limit
     now = time.monotonic()
@@ -203,6 +206,13 @@ def _writeln(line: str) -> bool:
     _last_send_ts = time.monotonic()
 
     data = (line + "\n").encode("ascii")
+    if _simulated or _ser is None:
+        _last_send_ok_ts = time.monotonic()
+        _debug_tick(True)
+        if not _suppress_simulated_set_logs:
+            log_event(f"[dimmer_controller] (Simulated) {line}")
+        return True
+
     with _lock:
         try:
             _ser.write(data)  # write_timeout=0 set in init
@@ -218,42 +228,53 @@ def _writeln(line: str) -> bool:
 # ----------------------------
 def init(port: str | None = None):
     """Open serial to UNO and start RX drain thread."""
-    global _ser, PORT, _last_sent_int, _last_send_ts, _last_send_ok_ts
-    if port:
-        PORT = port
-    _ser = serial.Serial(
-        PORT,
-        BAUD,
-        timeout=TIMEOUT,
-        write_timeout=0,      # non-blocking writes
-        inter_byte_timeout=0
-    )
-    _last_sent_int = None
-    _last_send_ts = 0.0
-    _last_send_ok_ts = 0.0
-
-    # start reader BEFORE we provoke INFO text, so we don't block the UNO
-    _start_rx_thread()
-
-    # friendly handshake
+    global _ser, _simulated, PORT, _last_sent_int, _last_send_ts, _last_send_ok_ts
     try:
-        _writeln("PING")
-        _writeln("INFO")
-    except Exception:
-        pass
+        if port:
+            PORT = port
+        _simulated = False
+        _ser = serial.Serial(
+            PORT,
+            BAUD,
+            timeout=TIMEOUT,
+            write_timeout=0,      # non-blocking writes
+            inter_byte_timeout=0
+        )
+        _last_sent_int = None
+        _last_send_ts = 0.0
+        _last_send_ok_ts = 0.0
 
-    dim(15)  # safe start
+        # start reader BEFORE we provoke INFO text, so we don't block the UNO
+        _start_rx_thread()
+
+        # friendly handshake
+        try:
+            _writeln("PING")
+            _writeln("INFO")
+        except Exception:
+            pass
+
+        dim(15)  # safe start
+    except Exception as e:
+        log_event(f"[dimmer_controller] Connection failed: {e}")
+        log_event("[dimmer_controller] Running in simulated mode.")
+        _ser = None
+        _simulated = True
+        _last_sent_int = None
+        _last_send_ts = 0.0
+        _last_send_ok_ts = 0.0
 
 def close():
     """Stop effects and close serial cleanly."""
     stop_flicker(join=True)
     _stop_rx_thread(join=True)
-    global _ser
+    global _ser, _simulated
     try:
         if _ser:
             _ser.close()
     finally:
         _ser = None
+        _simulated = True
 
 def request_stop():
     _global_stop_evt.set()
@@ -322,37 +343,48 @@ def _ramp(from_val: float, to_val: float, seg_duration: float,
         dim(to_val)
         return
 
+    global _suppress_simulated_set_logs
     steps = max(1, int(seg_duration / _RAMP_DT))
     start = time.monotonic()
     a = from_val
     b = to_val
     last_iv = None
+    suppress_previous = _suppress_simulated_set_logs
+    if _simulated:
+        log_event(
+            f"[dimmer_controller] (Simulated) ramp "
+            f"{int(round(a))}->{int(round(b))} over {seg_duration:.2f}s ({steps} steps)"
+        )
+        _suppress_simulated_set_logs = True
 
-    for i in range(steps):
-        if _should_stop_effect(local_stop):
-            return
-        t01 = i / (steps - 1) if steps > 1 else 1.0
-        if ease:
-            # cosine ease-in-out
-            t01 = 0.5 - 0.5 * math.cos(math.pi * t01)
-        val = a + (b - a) * t01
-        iv = int(round(max(0.0, min(100.0, val))))
-        last_iv = iv
-        dim(iv)
+    try:
+        for i in range(steps):
+            if _should_stop_effect(local_stop):
+                return
+            t01 = i / (steps - 1) if steps > 1 else 1.0
+            if ease:
+                # cosine ease-in-out
+                t01 = 0.5 - 0.5 * math.cos(math.pi * t01)
+            val = a + (b - a) * t01
+            iv = int(round(max(0.0, min(100.0, val))))
+            last_iv = iv
+            dim(iv)
 
-        # maintain cadence
-        target = start + (i + 1) * _RAMP_DT
-        sleep_left = target - time.monotonic()
-        if sleep_left > 0:
-            time.sleep(min(sleep_left, _RAMP_DT))
+            # maintain cadence
+            target = start + (i + 1) * _RAMP_DT
+            sleep_left = target - time.monotonic()
+            if sleep_left > 0:
+                time.sleep(min(sleep_left, _RAMP_DT))
 
-    # Final quick ACK sync (only if pacing enabled)
-    if last_iv is not None and _ACK_PACING:
-        prev = None
-        with _ack_cv:
-            prev = _ack_counter
-        _writeln(f"SET {last_iv}")  # send once more to ensure a fresh ACK marker
-        _wait_for_ack(prev, _ACK_TIMEOUT_S)
+        # Final quick ACK sync (only if pacing enabled)
+        if last_iv is not None and _ACK_PACING:
+            prev = None
+            with _ack_cv:
+                prev = _ack_counter
+            _writeln(f"SET {last_iv}")  # send once more to ensure a fresh ACK marker
+            _wait_for_ack(prev, _ACK_TIMEOUT_S)
+    finally:
+        _suppress_simulated_set_logs = suppress_previous
 
 def dimmer_flicker(duration: float,
                    min_intensity: float,
@@ -382,6 +414,12 @@ def dimmer_flicker(duration: float,
     stop_flicker(join=True)
 
     local_stop = threading.Event()
+    if _simulated:
+        log_event(
+            f"[dimmer_controller] (Simulated) flicker for {duration:.2f}s "
+            f"range={min_intensity:.0f}-{max_intensity:.0f}, "
+            f"segment={flicker_length_min:.2f}-{flicker_length_max:.2f}s"
+        )
 
     def _run():
         start_all = time.monotonic()
@@ -419,6 +457,10 @@ def ack_latency_test(set_value: int = 50, n: int = 30, ack_timeout_s: float = No
     """
     Send SET <value>, wait for 'ACK SET' each time via RX thread, measure RTT.
     """
+    if _simulated or _ser is None:
+        log_event("[dimmer_controller] (Simulated) ack_latency_test skipped; no dimmer board connected.")
+        return
+
     assert _ser is not None, "init() first"
     to = _ACK_TIMEOUT_S if ack_timeout_s is None else float(ack_timeout_s)
     rtts = []

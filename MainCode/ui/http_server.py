@@ -18,7 +18,7 @@ WEBPAGE = '''<!doctype html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>2025 Halloween Remote Control</title>
+  <title>[year] Halloween Remote Control</title>
   <style>
     :root { --bg: #111; --panel: #1c1c1c; --text: #f5f5f5; --muted: #a0a0a0; --accent: #3b82f6; --warn: #f59e0b; --danger: #ef4444; --ok: #22c55e; --border: #2a2a2a; --shadow: 0 10px 18px rgba(0,0,0,.45); --radius: 18px; --gap: 12px; }
     * { box-sizing: border-box; }
@@ -48,7 +48,7 @@ WEBPAGE = '''<!doctype html>
   </style>
 </head>
 <body>
-  <header>2025 Halloween Remote Control App</header>
+  <header>[year] Halloween Remote Control App</header>
   <main>
     <section class="hero">
       <div class="row"><button class="btn-danger" data-endpoint="/EMERGENCY_SHUTOFF" data-confirm="true">EMERGENCY SHUTOFF</button></div>
