@@ -104,7 +104,7 @@ def run():
         if BreakCheck():
             return
         m1Digital_Write(8, 0) # deck ambient ON
-        MedallionCallsEvent()
+        #MedallionCallsEvent()
         m1Digital_Write(8, 0) # deck ambient ON
         threading.Thread(target=randCannonsIdle, daemon=True, name="random cannons idle").start()
         #idleMusic(min_idle_time=210) #3.5 mins
