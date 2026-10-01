@@ -8,7 +8,8 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
-from utils.tools import log_event, BreakCheck
+from context import house
+from utils.tools import log_event
 
 PRIMARY_DEVICE_INDEX: Optional[int] = 3
 SECONDARY_DEVICE_INDEX: Optional[int] = 6
@@ -249,7 +250,11 @@ def play_audio(target_or_text:str,maybe_file:str|None=None,*,gain:float|None=Non
 def _break_monitor():
  while True:
   try:
-   if BreakCheck():
+   # BreakCheck() reports every failed check.  This daemon polls frequently so
+   # using it here turned an offline state into ~20 log/debug entries a second.
+   # Keep the same condition, but leave reporting to the foreground caller
+   # that actually needs diagnostic context.
+   if not house.HouseActive or house.systemState != "ONLINE":
     for m in tuple(_mixers.values()):m.stop_matching(lambda v:v.honor_breakcheck)
   except Exception as e:log_event(f"[Audio] BreakCheck monitor error: {e}")
   time.sleep(.05)
